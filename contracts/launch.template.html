@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hook Catch · token setup</title>
+  <style>
+    :root { --bg: #071321; --card: #0f2236; --line: rgba(196, 231, 255, .14); --text: #e6f2f7; --muted: #8ea6b8; --teal: #2ee6c5; --coral: #ff6b5b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, sans-serif; }
+    .card { width: min(620px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 28px; }
+    h1 { margin: 0 0 6px; font-size: 26px; }
+    p { color: var(--muted); margin: 0 0 14px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #071321; color: var(--text); font: 13px ui-monospace, Consolas, monospace; }
+    .step { border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-top: 14px; }
+    .step h3 { margin: 0 0 4px; font-size: 16px; display: flex; justify-content: space-between; gap: 10px; }
+    .step p { font-size: 13.5px; margin: 0 0 12px; }
+    .st { font: 600 12px ui-monospace, Consolas, monospace; color: var(--muted); }
+    .st.ok { color: var(--teal); }
+    button { width: 100%; height: 46px; border: 0; border-radius: 12px; background: var(--teal); color: #04221d; font: 700 15px system-ui, sans-serif; cursor: pointer; }
+    button.ghost { background: transparent; color: var(--teal); border: 1px solid var(--teal); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    #info { font: 12.5px ui-monospace, Consolas, monospace; color: var(--muted); margin: 12px 0 0; overflow-wrap: anywhere; }
+    #log { margin-top: 16px; font: 13px ui-monospace, Consolas, monospace; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .ok { color: var(--teal) !important; }
+    .err { color: var(--coral) !important; }
+    a { color: var(--teal); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>$HOOKCATCH setup</h1>
+    <p>Run these three steps from the wallet that deployed Hook Catch, after $HOOKCATCH launches on Pons.</p>
+    <button class="ghost" id="connect">Connect wallet</button>
+    <div style="margin-top:14px">
+      <label for="tok">$HOOKCATCH token address</label>
+      <input id="tok" placeholder="0x… (from Pons)" spellcheck="false" autocomplete="off">
+    </div>
+    <div id="info"></div>
+
+    <div class="step">
+      <h3>1. Holder perks <span class="st" id="s1">—</span></h3>
+      <p>setCatchToken: holders of 100K get a 0.10% fee and unlimited rules, 1M pay 0%. Can be set only once.</p>
+      <button id="b1" disabled>Set $HOOKCATCH in Hook Catch</button>
+    </div>
+    <div class="step">
+      <h3>2. Buyback &amp; burn contract <span class="st" id="s2">—</span></h3>
+      <p>Deploys HookCatchBuyback for $HOOKCATCH: the fees it receives can only buy $HOOKCATCH and burn it. No owner, no withdraw. Buys 0.003–0.05 ETH at a time, on the curve and after graduation in the v4 pool.</p>
+      <button id="b2" disabled>Deploy buyback contract</button>
+    </div>
+    <div class="step">
+      <h3>3. Send fees to the buyback <span class="st" id="s3">—</span></h3>
+      <p>setFeeSink: from now on every protocol fee goes to the buyback contract. The keeper bot runs the buyback when 0.003 ETH has piled up.</p>
+      <button id="b3" disabled>Point fees at the buyback</button>
+    </div>
+    <div id="log"></div>
+  </div>
+  <script>
+    const HOOKCATCH = '0xc2ab35c41022da338a4fe450444e20a41044bdd6';
+    const BUYBACK_BYTECODE = '__BUYBACK_BYTECODE__';
+    const RPC = 'https://rpc.mainnet.chain.robinhood.com';
+    const CHAIN = '0x1237';
+    const EXPLORER = 'https://robinhoodchain.blockscout.com';
+    const FACTORY = '0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e';
+    const LAUNCH_TOPIC = '0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607';
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const SEL = { setCatchToken: '0xe3163489', setFeeSink: '0xda62e064', owner: '0x8da5cb5b', catchToken: '0xc4a69348', feeSink: '0x4b38474d', token: '0xfc0c546a', quote: '0x3de35b79', pending: '0xe20ccec3' };
+    const MIN_BUY = 3n * 10n ** 15n, MAX_BUY = 5n * 10n ** 16n; // 0.003 and 0.05 ETH
+
+    const $ = (id) => document.getElementById(id);
+    const log = (t, cls) => { $('log').innerHTML += `<div class="${cls || ''}">${t}</div>`; };
+    const short = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+    const link = (a, kind = 'address') => `<a href="${EXPLORER}/${kind}/${a}" target="_blank" rel="noopener">${kind === 'tx' ? 'tx ↗' : short(a)}</a>`;
+    const word = (v) => BigInt(v).toString(16).padStart(64, '0');
+    const addrWord = (a) => a.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+    const toAddr = (w) => (!w || w === '0x' ? ZERO : '0x' + w.slice(-40).toLowerCase());
+    async function rpc(method, params) {
+      const j = await (await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json();
+      if (j.error) throw new Error(j.error.message);
+      return j.result;
+    }
+    const call = (to, data) => rpc('eth_call', [{ to, data }, 'latest']);
+
+    let wallet = null, owner = null, catchToken = ZERO, feeSink = ZERO, token = null, curve = null, buyback = null;
+    try { buyback = localStorage.getItem('hc-buyback'); } catch {}
+
+    async function connect() {
+      if (!window.ethereum) { log('No wallet found. Open this page in the browser with your wallet.', 'err'); return false; }
+      [wallet] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN }] }); }
+      catch (e) {
+        if (e.code !== 4902) throw e;
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: CHAIN, chainName: 'Robinhood Chain', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: [RPC], blockExplorerUrls: [EXPLORER] }] });
+      }
+      $('connect').textContent = 'Connected: ' + short(wallet);
+      await refresh();
+      return true;
+    }
+
+    async function sendTx(tx, what) {
+      const hash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: wallet, ...tx }] });
+      log(`${what}: sent ${link(hash, 'tx')} · waiting…`);
+      for (let i = 0; i < 90; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const rc = await rpc('eth_getTransactionReceipt', [hash]);
+        if (rc) { if (rc.status !== '0x1') throw new Error(what + ' failed on-chain'); return rc; }
+      }
+      throw new Error('still pending, check the transaction link');
+    }
+
+    // the token's Pons curve, from the factory's launch event (and checked against the curve itself)
+    async function findCurve(t) {
+      const head = parseInt(await rpc('eth_blockNumber', []), 16);
+      const topic1 = '0x' + addrWord(t);
+      for (let to = head, k = 0; to > 0 && k < 6; to -= 9_900_000, k++) {
+        const from = Math.max(0, to - 9_899_999);
+        const logs = await rpc('eth_getLogs', [{ address: FACTORY, topics: [LAUNCH_TOPIC, topic1], fromBlock: '0x' + from.toString(16), toBlock: '0x' + to.toString(16) }]).catch(() => []);
+        if (logs.length) {
+          const c = '0x' + logs[0].topics[2].slice(26);
+          if (toAddr(await call(c, SEL.token)) !== t) return null;
+          if (BigInt(await call(c, SEL.quote)) !== 0n) throw new Error('this launch is not paired with ETH');
+          return c;
+        }
+      }
+      return null;
+    }
+
+    async function refresh() {
+      [owner, catchToken, feeSink] = (await Promise.all([call(HOOKCATCH, SEL.owner), call(HOOKCATCH, SEL.catchToken), call(HOOKCATCH, SEL.feeSink)])).map(toAddr);
+      const sinkCode = await rpc('eth_getCode', [feeSink, 'latest']);
+      if (sinkCode !== '0x') buyback = feeSink;
+      const isOwner = wallet && wallet.toLowerCase() === owner;
+      $('info').innerHTML = `Hook Catch ${link(HOOKCATCH)} · owner ${link(owner)}${wallet && !isOwner ? ' <span class="err">· connect the owner wallet</span>' : ''}<br>`
+        + `token ${catchToken === ZERO ? 'not set' : link(catchToken)} · fee sink ${link(feeSink)}${sinkCode !== '0x' ? ' (buyback contract)' : ' (wallet)'}`
+        + (token ? `<br>$HOOKCATCH ${link(token)} · curve ${curve ? link(curve) : 'not found'}` : '');
+      const done1 = catchToken !== ZERO, done3 = sinkCode !== '0x';
+      $('s1').textContent = done1 ? 'done' : 'to do'; $('s1').className = 'st' + (done1 ? ' ok' : '');
+      $('s2').innerHTML = buyback ? 'done · ' + link(buyback) : 'to do'; $('s2').className = 'st' + (buyback ? ' ok' : '');
+      $('s3').textContent = done3 ? 'done' : 'to do'; $('s3').className = 'st' + (done3 ? ' ok' : '');
+      $('b1').disabled = !isOwner || done1 || !token || !curve;
+      $('b2').disabled = !wallet || !!buyback || !token || !curve;
+      $('b3').disabled = !isOwner || done3 || !buyback;
+    }
+
+    $('connect').onclick = () => connect().catch((e) => log(e.message, 'err'));
+    $('tok').addEventListener('change', async () => {
+      const v = $('tok').value.trim().toLowerCase();
+      token = curve = null;
+      if (!/^0x[0-9a-f]{40}$/.test(v)) { if (v) log('Not a token address.', 'err'); return refresh(); }
+      token = v;
+      $('info').textContent = 'Looking up the Pons launch…';
+      try { curve = await findCurve(v); if (!curve) log('No Pons launch found for this token.', 'err'); }
+      catch (e) { log(e.message, 'err'); }
+      refresh();
+    });
+    $('b1').onclick = async () => {
+      try { await sendTx({ to: HOOKCATCH, data: SEL.setCatchToken + addrWord(token) }, 'setCatchToken'); log('Holder perks are on.', 'ok'); }
+      catch (e) { log(e.code === 4001 ? 'Cancelled in the wallet.' : e.message, 'err'); }
+      refresh();
+    };
+    $('b2').onclick = async () => {
+      try {
+        // constructor(token, curve, poolFee 0, tickSpacing 200, minBuy, maxBuy): the Pons graduation pool
+        const data = BUYBACK_BYTECODE + addrWord(token) + addrWord(curve) + word(0) + word(200) + word(MIN_BUY) + word(MAX_BUY);
+        const rc = await sendTx({ data }, 'Buyback deploy');
+        buyback = rc.contractAddress.toLowerCase();
+        try { localStorage.setItem('hc-buyback', buyback); } catch {}
+        log('Buyback contract: ' + buyback, 'ok');
+      } catch (e) { log(e.code === 4001 ? 'Cancelled in the wallet.' : e.message, 'err'); }
+      refresh();
+    };
+    $('b3').onclick = async () => {
+      try { await sendTx({ to: HOOKCATCH, data: SEL.setFeeSink + addrWord(buyback) }, 'setFeeSink'); log('Every protocol fee now buys and burns $HOOKCATCH.', 'ok'); }
+      catch (e) { log(e.code === 4001 ? 'Cancelled in the wallet.' : e.message, 'err'); }
+      refresh();
+    };
+    refresh().catch((e) => log(e.message, 'err'));
+  </script>
+</body>
+</html>

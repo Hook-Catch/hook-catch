@@ -5,3 +5,4 @@ contracts/build/HookCatch.json
 contracts/deploy.html
 *.key
 .env
+contracts/launch.html

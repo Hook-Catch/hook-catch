@@ -16,3 +16,5 @@ mkdirSync(new URL('./build/', import.meta.url), { recursive: true });
 writeFileSync(new URL('./build/HookCatchBuyback.json', import.meta.url), JSON.stringify({ abi: c.abi, bytecode: '0x' + c.evm.bytecode.object }, null, 1));
 writeFileSync(new URL('./HookCatchBuyback.standard-input.json', import.meta.url), JSON.stringify({ ...input, settings: { ...input.settings, outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object', 'evm.deployedBytecode.object', 'metadata'] } } } }, null, 2));
 console.log('compiled HookCatchBuyback, bytecode', c.evm.bytecode.object.length / 2, 'bytes');
+writeFileSync(new URL('./launch.html', import.meta.url), readFileSync(new URL('./launch.template.html', import.meta.url), 'utf8').replace('__BUYBACK_BYTECODE__', '0x' + c.evm.bytecode.object));
+console.log('wrote launch.html');
