@@ -23,8 +23,11 @@ echo "[4/4] Keeper wallet"
 if [ ! -f .env ]; then
   echo
   read -rsp "Private key of the KEEPER wallet (a fresh wallet with a little ETH, not your main one): " KEY </dev/tty; echo
-  KEY="${KEY#0x}"
-  if ! [[ "$KEY" =~ ^[0-9a-fA-F]{64}$ ]]; then echo "That is not a private key (64 hex characters). Run the script again."; exit 1; fi
+  KEY="$(printf '%s' "$KEY" | tr -d '[:space:]"')"; KEY="${KEY#0x}"
+  if ! [[ "$KEY" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    echo "That is not an EVM private key: expected 64 characters of 0-9 and a-f, got ${#KEY} characters."
+    echo "In Phantom, export the key of the Ethereum account (not Solana). Run: bash setup.sh"; exit 1
+  fi
   umask 077 && printf 'KEEPER_KEY=0x%s\nHOOKCATCH=%s\n' "$KEY" "$HOOKCATCH" > .env
   unset KEY
 fi
