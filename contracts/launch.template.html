@@ -83,7 +83,7 @@
     const call = (to, data) => rpc('eth_call', [{ to, data }, 'latest']);
 
     let wallet = null, owner = null, catchToken = ZERO, feeSink = ZERO, token = null, curve = null, buyback = null;
-    try { buyback = localStorage.getItem('hc-buyback'); } catch {}
+    try { buyback = localStorage.getItem('hc-buyback-' + HOOKCATCH); } catch {}
 
     async function connect() {
       if (!window.ethereum) { log('No wallet found. Open this page in the browser with your wallet.', 'err'); return false; }
@@ -130,6 +130,11 @@
       [owner, catchToken, feeSink] = (await Promise.all([call(HOOKCATCH, SEL.owner), call(HOOKCATCH, SEL.catchToken), call(HOOKCATCH, SEL.feeSink)])).map(toAddr);
       const sinkCode = await rpc('eth_getCode', [feeSink, 'latest']);
       if (sinkCode !== '0x') buyback = feeSink;
+      // a remembered buyback address counts only if it is on-chain and burns this very token
+      if (buyback && buyback !== feeSink) {
+        const ok = token && (await rpc('eth_getCode', [buyback, 'latest'])) !== '0x' && toAddr(await call(buyback, SEL.token).catch(() => '0x')) === token;
+        if (!ok) buyback = null;
+      }
       const isOwner = wallet && wallet.toLowerCase() === owner;
       $('info').innerHTML = `Hook Catch ${link(HOOKCATCH)} · owner ${link(owner)}${wallet && !isOwner ? ' <span class="err">· connect the owner wallet</span>' : ''}<br>`
         + `token ${catchToken === ZERO ? 'not set' : link(catchToken)} · fee sink ${link(feeSink)}${sinkCode !== '0x' ? ' (buyback contract)' : ' (wallet)'}`
@@ -165,7 +170,7 @@
         const data = BUYBACK_BYTECODE + addrWord(token) + addrWord(curve) + word(0) + word(200) + word(MIN_BUY) + word(MAX_BUY);
         const rc = await sendTx({ data }, 'Buyback deploy');
         buyback = rc.contractAddress.toLowerCase();
-        try { localStorage.setItem('hc-buyback', buyback); } catch {}
+        try { localStorage.setItem('hc-buyback-' + HOOKCATCH, buyback); } catch {}
         log('Buyback contract: ' + buyback, 'ok');
       } catch (e) { log(e.code === 4001 ? 'Cancelled in the wallet.' : e.message, 'err'); }
       refresh();
@@ -175,7 +180,9 @@
       catch (e) { log(e.code === 4001 ? 'Cancelled in the wallet.' : e.message, 'err'); }
       refresh();
     };
-    refresh().catch((e) => log(e.message, 'err'));
+    const PRESET = '__PRESET_TOKEN__';
+    if (/^0x[0-9a-fA-F]{40}$/.test(PRESET)) { $('tok').value = PRESET; $('tok').dispatchEvent(new Event('change')); }
+    else refresh().catch((e) => log(e.message, 'err'));
   </script>
 </body>
 </html>
