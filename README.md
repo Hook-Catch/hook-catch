@@ -25,8 +25,8 @@ Every rule carries a **limit price**: the trade reverts if the fill is worse, so
 |---|---|
 | Keeper | 0.30% of each trade, paid to whoever executes it |
 | Protocol | 0.20% to the fee wallet, used for $HOOKCATCH buybacks |
-| Hold 100K $HOOKCATCH | protocol fee 0.10% |
-| Hold 1M $HOOKCATCH | protocol fee 0%, unlimited rules |
+| Hold 100K $HOOKCATCH | protocol fee 0.10%, unlimited rules |
+| Hold 1M $HOOKCATCH | protocol fee 0% |
 | Without the token | up to 3 active rules |
 
 The owner can only change the fee wallet and set the $HOOKCATCH address once. There is no pause, no upgrade and no function that moves user funds.
