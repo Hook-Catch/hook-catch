@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hook Catch · listing pool</title>
+  <style>
+    :root { --bg: #071321; --card: #0f2236; --line: rgba(196, 231, 255, .14); --text: #e6f2f7; --muted: #8ea6b8; --teal: #2ee6c5; --coral: #ff6b5b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, sans-serif; }
+    .card { width: min(640px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 28px; }
+    h1 { margin: 0 0 6px; font-size: 26px; }
+    p { color: var(--muted); margin: 0 0 14px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+    input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #071321; color: var(--text); font: 13px ui-monospace, Consolas, monospace; }
+    table { width: 100%; border-collapse: collapse; font: 12.5px ui-monospace, Consolas, monospace; margin: 14px 0 4px; }
+    td { padding: 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+    td:first-child { color: var(--muted); width: 150px; }
+    .step { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+    .step h3 { margin: 0 0 4px; font-size: 15px; display: flex; justify-content: space-between; gap: 10px; }
+    .step p { font-size: 13px; margin: 0 0 10px; }
+    .st { font: 600 12px ui-monospace, Consolas, monospace; color: var(--muted); }
+    .st.ok { color: var(--teal); }
+    button { width: 100%; height: 44px; border: 0; border-radius: 12px; background: var(--teal); color: #04221d; font: 700 15px system-ui, sans-serif; cursor: pointer; }
+    button.ghost { background: transparent; color: var(--teal); border: 1px solid var(--teal); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    #log { margin-top: 16px; font: 13px ui-monospace, Consolas, monospace; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .ok { color: var(--teal) !important; }
+    .err { color: var(--coral) !important; }
+    a { color: var(--teal); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Listing pool</h1>
+    <p>Creates a small ETH / token pool on Uniswap v4 at the token's current Pons price, so DexScreener lists the token before graduation. The Pons graduation pool is a different pool (fee 0, Pons hook) and is not affected.</p>
+    <button class="ghost" id="connect">Connect wallet</button>
+    <label for="tok">Token</label>
+    <input id="tok" spellcheck="false" autocomplete="off">
+    <label for="eth">ETH to put in the pool (the same value in tokens goes in too)</label>
+    <input id="eth" type="number" min="0" step="0.0001" value="0.0005">
+    <table id="sum"></table>
+
+    <div class="step"><h3>1. Allow Permit2 to move the token <span class="st" id="s1">—</span></h3><p>Standard Uniswap approval, once per token.</p><button id="b1" disabled>Approve token</button></div>
+    <div class="step"><h3>2. Allow the position manager <span class="st" id="s2">—</span></h3><p>Lets Uniswap's position manager take exactly the tokens shown above, valid for one day.</p><button id="b2" disabled>Approve amount</button></div>
+    <div class="step"><h3>3. Create the pool and add liquidity <span class="st" id="s3">—</span></h3><p>One transaction: starts the pool at the Pons price and deposits both sides over the full price range. Unused ETH comes back.</p><button id="b3" disabled>Create pool</button></div>
+    <div class="step"><h3>4. Lock it forever (optional) <span class="st" id="s4">—</span></h3><p>Sends the position NFT to 0x…dEaD, so nobody can ever remove this liquidity. Proof against "rug" questions.</p><button id="b4" disabled>Lock liquidity</button></div>
+    <div id="log"></div>
+  </div>
+  <script type="module">
+    import { createPublicClient, http, encodeAbiParameters, encodeFunctionData, parseAbi, parseEther, formatEther, formatUnits, keccak256, getAddress, isAddress, maxUint256 } from 'https://cdn.jsdelivr.net/npm/viem@2.21.0/+esm';
+
+    const PRESET = '__PRESET_TOKEN__';
+    const RPC = 'https://rpc.mainnet.chain.robinhood.com';
+    const CHAIN = '0x1237';
+    const EXPLORER = 'https://robinhoodchain.blockscout.com';
+    const POSM = '0x58daec3116aae6d93017baaea7749052e8a04fa7'; // Uniswap v4 PositionManager
+    const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
+    const POOL_MANAGER = '0x8366a39CC670B4001A1121B8F6A443A643e40951';
+    const FACTORY = '0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e';
+    const LAUNCH_TOPIC = '0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607';
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const DEAD = '0x000000000000000000000000000000000000dEaD';
+    const FEE = 10000, SPACING = 200, TICK = 887200; // 1% pool, full range
+    const Q96 = 1n << 96n;
+
+    const ERC20 = parseAbi(['function symbol() view returns (string)', 'function decimals() view returns (uint8)', 'function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)']);
+    const P2 = parseAbi(['function allowance(address,address,address) view returns (uint160 amount, uint48 expiration, uint48 nonce)', 'function approve(address token, address spender, uint160 amount, uint48 expiration)']);
+    const CURVE = parseAbi(['function getReserves() view returns (uint256, uint256)']);
+    const POSM_ABI = parseAbi(['function multicall(bytes[] data) payable returns (bytes[])', 'function nextTokenId() view returns (uint256)', 'function transferFrom(address from, address to, uint256 id)', 'function ownerOf(uint256 id) view returns (address)']);
+    const KEY = { type: 'tuple', components: [{ name: 'currency0', type: 'address' }, { name: 'currency1', type: 'address' }, { name: 'fee', type: 'uint24' }, { name: 'tickSpacing', type: 'int24' }, { name: 'hooks', type: 'address' }] };
+    const INIT_ABI = parseAbi(['function initializePool((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint160 sqrtPriceX96) payable returns (int24)', 'function modifyLiquidities(bytes unlockData, uint256 deadline) payable']);
+
+    const pub = createPublicClient({ transport: http(RPC, { retryCount: 6, retryDelay: 250 }) });
+    const $ = (id) => document.getElementById(id);
+    const log = (t, cls) => { $('log').innerHTML += `<div class="${cls || ''}">${t}</div>`; };
+    const short = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+    const link = (a, kind = 'address') => `<a href="${EXPLORER}/${kind}/${a}" target="_blank" rel="noopener">${kind === 'tx' ? 'tx ↗' : short(a)}</a>`;
+    // integer square root: Newton's method from a starting point above the root, so it only ever steps down
+    const isqrt = (n) => { if (n < 2n) return n; let x = BigInt(Math.ceil(Math.sqrt(Number(n)) * 1.001)) + 1n; for (;;) { const y = (x + n / x) >> 1n; if (y >= x) return x; x = y; } };
+    const sqrtAtTick = (t) => BigInt(Math.floor(Math.pow(1.0001, t / 2) * 2 ** 96).toLocaleString('fullwide', { useGrouping: false }));
+
+    let wallet = null, st = null, tokenId = null;
+    try { tokenId = localStorage.getItem('hc-pool-nft'); } catch {}
+
+    async function connect() {
+      if (!window.ethereum) { log('No wallet found. Open this page in the browser with your wallet.', 'err'); return; }
+      [wallet] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN }] }); }
+      catch (e) {
+        if (e.code !== 4902) throw e;
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: CHAIN, chainName: 'Robinhood Chain', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: [RPC], blockExplorerUrls: [EXPLORER] }] });
+      }
+      $('connect').textContent = 'Connected: ' + short(wallet);
+      await load();
+    }
+    async function sendTx(tx, what) {
+      const hash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: wallet, ...tx }] });
+      log(`${what}: sent ${link(hash, 'tx')} · waiting…`);
+      for (let i = 0; i < 90; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const rc = await pub.request({ method: 'eth_getTransactionReceipt', params: [hash] });
+        if (rc) { if (rc.status !== '0x1') throw new Error(what + ' failed on-chain'); return rc; }
+      }
+      throw new Error('still pending, check the transaction link');
+    }
+
+    const chainTime = async () => Number((await pub.getBlock()).timestamp); // deadlines follow the chain's clock
+    async function findCurve(t) {
+      const head = Number(await pub.getBlockNumber());
+      for (let to = head, k = 0; to > 0 && k < 6; to -= 9_900_000, k++) {
+        const logs = await pub.request({ method: 'eth_getLogs', params: [{ address: FACTORY, topics: [LAUNCH_TOPIC, '0x' + t.slice(2).toLowerCase().padStart(64, '0')], fromBlock: '0x' + Math.max(0, to - 9_899_999).toString(16), toBlock: '0x' + to.toString(16) }] });
+        if (logs.length) return getAddress('0x' + logs[0].topics[2].slice(26));
+      }
+      return null;
+    }
+
+    // everything the steps need, recomputed from the chain each time
+    async function load() {
+      const t = $('tok').value.trim();
+      if (!isAddress(t)) { $('sum').innerHTML = ''; return; }
+      const token = getAddress(t);
+      const key = { currency0: ZERO, currency1: token, fee: FEE, tickSpacing: SPACING, hooks: ZERO };
+      const poolId = keccak256(encodeAbiParameters([KEY], [key]));
+      const slot = keccak256(encodeAbiParameters([{ type: 'bytes32' }, { type: 'uint256' }], [poolId, 6n]));
+      const curve = st?.token === token ? st.curve : await findCurve(token);
+      if (!curve) { $('sum').innerHTML = '<tr><td colspan="2" class="err">No Pons launch found for this token.</td></tr>'; return; }
+      const [[q, r], symbol, decimals, slot0] = await Promise.all([
+        pub.readContract({ address: curve, abi: CURVE, functionName: 'getReserves' }),
+        pub.readContract({ address: token, abi: ERC20, functionName: 'symbol' }),
+        pub.readContract({ address: token, abi: ERC20, functionName: 'decimals' }),
+        pub.call({ to: POOL_MANAGER, data: '0x1e2eaeaf' + slot.slice(2) }),
+      ]);
+      if (r === 0n) { $('sum').innerHTML = `<tr><td colspan="2" class="err">$${symbol} has already graduated from its Pons curve. Its Uniswap pool is listed on DexScreener on its own.</td></tr>`; st = null; return refresh(); }
+      const existing = BigInt(slot0.data || '0x0') & ((1n << 160n) - 1n);
+      // price as token base units per wei, so sqrtPriceX96 = sqrt(r/q) * 2^96
+      const sqrtP = existing || isqrt((r << 192n) / q);
+      const eth = parseEther(String($('eth').value || '0'));
+      const sqrtL = sqrtAtTick(-TICK), sqrtU = sqrtAtTick(TICK);
+      // full-range amounts for a given liquidity: token side = L*(sqrtP - sqrtL)/Q96, ETH side = L*Q96*(sqrtU - sqrtP)/(sqrtP*sqrtU)
+      const L = (eth * sqrtP * sqrtU) / Q96 / (sqrtU - sqrtP);
+      const liquidity = (L * 99n) / 100n;
+      const tokens = (liquidity * (sqrtP - sqrtL)) / Q96 + 1n;
+      const tokensMax = (tokens * 101n) / 100n;
+      st = { token, curve, symbol, decimals, key, poolId, sqrtP, existing, eth, liquidity, tokens, tokensMax };
+      const priceEth = Number(q) / Number(r);
+      $('sum').innerHTML = `<tr><td>Token</td><td>$${symbol} · ${link(token)}</td></tr>`
+        + `<tr><td>Pons price</td><td>${priceEth.toPrecision(4)} ETH per token</td></tr>`
+        + `<tr><td>Pool</td><td>ETH / $${symbol} · fee 1% · no hook · full range</td></tr>`
+        + `<tr><td>Pool id</td><td>${poolId}${existing ? ' <span class="ok">(already exists, liquidity is added at its price)</span>' : ''}</td></tr>`
+        + `<tr><td>Deposit</td><td>${formatEther(eth)} ETH + ${Number(formatUnits(tokens, decimals)).toLocaleString('en-US', { maximumFractionDigits: 0 })} $${symbol}</td></tr>`;
+      await refresh();
+    }
+
+    async function refresh() {
+      if (!st || !wallet) { ['b1', 'b2', 'b3', 'b4'].forEach((b) => ($(b).disabled = true)); return; }
+      const [bal, ethBal, a1, a2] = await Promise.all([
+        pub.readContract({ address: st.token, abi: ERC20, functionName: 'balanceOf', args: [wallet] }),
+        pub.getBalance({ address: wallet }),
+        pub.readContract({ address: st.token, abi: ERC20, functionName: 'allowance', args: [wallet, PERMIT2] }),
+        pub.readContract({ address: PERMIT2, abi: P2, functionName: 'allowance', args: [wallet, st.token, POSM] }),
+      ]);
+      const now = await chainTime();
+      const ok1 = a1 >= st.tokensMax, ok2 = a2[0] >= st.tokensMax && Number(a2[1]) > now + 300;
+      let ok3 = false, ok4 = false;
+      if (tokenId) {
+        const owner = await pub.readContract({ address: POSM, abi: POSM_ABI, functionName: 'ownerOf', args: [BigInt(tokenId)] }).catch(() => null);
+        ok3 = !!owner; ok4 = owner?.toLowerCase() === DEAD.toLowerCase();
+      }
+      const set = (id, done, text) => { $(id).textContent = done ? (text || 'done') : 'to do'; $(id).className = 'st' + (done ? ' ok' : ''); };
+      set('s1', ok1); set('s2', ok2); set('s3', ok3, tokenId ? 'done · NFT #' + tokenId : 'done'); set('s4', ok4);
+      const enough = bal >= st.tokensMax && ethBal > st.eth;
+      if (!enough && !ok3) log(`Need ${formatUnits(st.tokensMax, st.decimals)} $${st.symbol} and a bit more than ${formatEther(st.eth)} ETH in this wallet.`, 'err');
+      $('b1').disabled = ok1 || ok3;
+      $('b2').disabled = !ok1 || ok2 || ok3;
+      $('b3').disabled = !ok1 || !ok2 || ok3 || !enough || st.eth === 0n;
+      $('b4').disabled = !ok3 || ok4;
+    }
+
+    const fail = (e) => log(e.code === 4001 ? 'Cancelled in the wallet.' : (e.shortMessage || e.message), 'err');
+    $('connect').onclick = () => connect().catch(fail);
+    $('tok').addEventListener('change', () => { st = null; load().catch(fail); });
+    $('eth').addEventListener('change', () => load().catch(fail));
+    $('b1').onclick = async () => { try { await sendTx({ to: st.token, data: encodeFunctionData({ abi: ERC20, functionName: 'approve', args: [PERMIT2, maxUint256] }) }, 'Approve'); } catch (e) { fail(e); } refresh(); };
+    $('b2').onclick = async () => {
+      try { await sendTx({ to: PERMIT2, data: encodeFunctionData({ abi: P2, functionName: 'approve', args: [st.token, POSM, st.tokensMax, (await chainTime()) + 86400] }) }, 'Permit2 approve'); }
+      catch (e) { fail(e); }
+      refresh();
+    };
+    $('b3').onclick = async () => {
+      try {
+        await load(); // fresh price right before sending
+        // MINT_POSITION, SETTLE_PAIR, SWEEP (unused ETH back to the wallet)
+        const params = [
+          encodeAbiParameters([KEY, { type: 'int24' }, { type: 'int24' }, { type: 'uint256' }, { type: 'uint128' }, { type: 'uint128' }, { type: 'address' }, { type: 'bytes' }], [st.key, -TICK, TICK, st.liquidity, (st.eth * 102n) / 100n, st.tokensMax, wallet, '0x']),
+          encodeAbiParameters([{ type: 'address' }, { type: 'address' }], [ZERO, st.token]),
+          encodeAbiParameters([{ type: 'address' }, { type: 'address' }], [ZERO, wallet]),
+        ];
+        const unlock = encodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], ['0x020d14', params]);
+        const calls = [];
+        if (!st.existing) calls.push(encodeFunctionData({ abi: INIT_ABI, functionName: 'initializePool', args: [st.key, st.sqrtP] }));
+        calls.push(encodeFunctionData({ abi: INIT_ABI, functionName: 'modifyLiquidities', args: [unlock, BigInt((await chainTime()) + 1200)] }));
+        const id = await pub.readContract({ address: POSM, abi: POSM_ABI, functionName: 'nextTokenId' });
+        const rc = await sendTx({ to: POSM, data: encodeFunctionData({ abi: POSM_ABI, functionName: 'multicall', args: [calls] }), value: '0x' + ((st.eth * 102n) / 100n).toString(16) }, 'Create pool');
+        // the minted NFT id, from the ERC-721 Transfer in the receipt
+        const mint = rc.logs.find((l) => l.address.toLowerCase() === POSM.toLowerCase() && l.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef');
+        tokenId = String(mint ? BigInt(mint.topics[3]) : id);
+        try { localStorage.setItem('hc-pool-nft', tokenId); } catch {}
+        log(`Pool live. Position NFT #${tokenId}. DexScreener usually lists it within minutes: <a href="https://dexscreener.com/search?q=${st.token}" target="_blank" rel="noopener">check</a>`, 'ok');
+      } catch (e) { fail(e); }
+      refresh();
+    };
+    $('b4').onclick = async () => {
+      try { await sendTx({ to: POSM, data: encodeFunctionData({ abi: POSM_ABI, functionName: 'transferFrom', args: [wallet, DEAD, BigInt(tokenId)] }) }, 'Lock'); log('Liquidity locked forever: the position NFT is at 0x…dEaD.', 'ok'); }
+      catch (e) { fail(e); }
+      refresh();
+    };
+
+    $('tok').value = /^0x[0-9a-fA-F]{40}$/.test(PRESET) ? PRESET : '';
+    load().catch(fail);
+  </script>
+</body>
+</html>
