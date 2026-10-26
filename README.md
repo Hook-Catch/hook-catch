@@ -2,7 +2,7 @@
 
 Price rules that trade for you on Robinhood Chain: take profit, stop loss, buy the dip and DCA for Pons tokens and Uniswap v4 pools. One contract, open keepers, and nothing held for you except the ETH you deposit for buys.
 
-**Token:** $HOOKCATCH · **Chain:** Robinhood Chain (4663) · **Contract:** _added after deployment_
+**Token:** $HOOKCATCH · **Chain:** Robinhood Chain (4663) · **Contract:** [`0xc2ab35c41022da338a4fe450444e20a41044bdd6`](https://robinhoodchain.blockscout.com/address/0xc2ab35c41022da338a4fe450444e20a41044bdd6) · [verified on Sourcify](https://repo.sourcify.dev/4663/0xc2ab35c41022da338a4fe450444e20a41044bdd6)
 
 ## How it works
 
