@@ -72,7 +72,13 @@ npm install
 KEEPER_KEY=0x... HOOKCATCH=<contract> node keeper.mjs
 ```
 
-Use a fresh wallet with a little ETH for gas, never your main wallet. Options: `RPC`, `INTERVAL` (seconds, default 20), `MIN_PROFIT` (fee must beat gas by this factor, default 1.2; 0 executes everything), `DRY_RUN=1`, `ONCE=1`.
+On a fresh Ubuntu server, one command installs it with pm2 and asks for the key:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Hook-Catch/hook-catch/main/keeper/setup.sh | bash
+```
+
+`keeper.bundle.mjs` is the same bot with its libraries bundled (esbuild), so the server needs no npm install. Use a fresh wallet with a little ETH for gas, never your main wallet. Options: `RPC`, `INTERVAL` (seconds, default 20), `MIN_PROFIT` (fee must beat gas by this factor, default 1.2; 0 executes everything), `DRY_RUN=1`, `ONCE=1`.
 
 ## Risks
 
