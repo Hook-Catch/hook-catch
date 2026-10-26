@@ -1,0 +1,9 @@
+{
+  "name": "hookcatch-contracts",
+  "version": "1.0.0",
+  "description": "Hook Catch contract: price rules for Pons tokens and Uniswap v4 pools on Robinhood Chain.",
+  "type": "module",
+  "scripts": { "compile": "node compile.mjs", "test": "node test.mjs" },
+  "license": "MIT",
+  "dependencies": { "hardhat": "^2.22.17", "solc": "^0.8.24", "viem": "^2.21.0" }
+}

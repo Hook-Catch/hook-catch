@@ -1,0 +1,10 @@
+{
+  "name": "hookcatch-keeper",
+  "version": "1.0.0",
+  "description": "Executes Hook Catch rules whose price line has been crossed, for the 0.30% keeper fee.",
+  "type": "module",
+  "main": "keeper.mjs",
+  "scripts": { "start": "node keeper.mjs" },
+  "license": "MIT",
+  "dependencies": { "viem": "2.21.0" }
+}

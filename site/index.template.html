@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hook Catch — buy the dip, take the profit, while you sleep</title>
+  <meta name="description" content="Price rules that trade for you on Robinhood Chain. Take profit, stop loss, buy the dip and DCA for Pons tokens. Non-custodial sells, withdraw-anytime buys, executed by open keepers.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Hook Catch — rules that trade while you sleep">
+  <meta property="og:description" content="Take profit, stop loss, buy the dip and DCA on Robinhood Chain. One contract, open keepers, nothing custodied but what you deposit for buys.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1a2c'/%3E%3Cpath d='M38 12v24a10 10 0 1 1-20 0v-4' fill='none' stroke='%232ee6c5' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M18 32l-5 5' stroke='%232ee6c5' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='38' cy='10' r='4' fill='%23ff6b5b'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --bg: #071321; --bg-2: #0b1a2c; --card: #0f2236; --card-2: #142b44; --line: rgba(196, 231, 255, .1); --line-2: rgba(196, 231, 255, .18);
+      --text: #e6f2f7; --muted: #8ea6b8; --dim: #5d7689; --teal: #2ee6c5; --teal-2: #8af5e1; --teal-soft: rgba(46, 230, 197, .12);
+      --coral: #ff6b5b; --coral-soft: rgba(255, 107, 91, .12); --gold: #ffc65c; --gold-soft: rgba(255, 198, 92, .12);
+      --sans: "Outfit", system-ui, sans-serif; --mono: "Fira Code", ui-monospace, Consolas, monospace;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); overflow-x: hidden; }
+    body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(1000px 600px at 85% -10%, rgba(46, 230, 197, .13), transparent 60%), radial-gradient(800px 500px at -10% 20%, rgba(255, 107, 91, .07), transparent 60%); }
+    a { color: inherit; }
+    h1, h2, h3, p { margin: 0; }
+    code, .mono { font-family: var(--mono); }
+    .wrap { max-width: 1180px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+    .page { display: none; } .page.on { display: block; }
+
+    .top { position: sticky; top: 0; z-index: 20; background: rgba(7, 19, 33, .85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+    .nav { display: flex; align-items: center; gap: 18px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 800 21px var(--sans); letter-spacing: -.02em; }
+    .brand svg { width: 32px; height: 32px; }
+    .menu { display: flex; gap: 2px; margin-left: auto; }
+    .menu a { padding: 7px 12px; border-radius: 8px; text-decoration: none; color: var(--muted); font-weight: 500; font-size: 15px; }
+    .menu a:hover { color: var(--text); }
+    .menu a.on { color: var(--teal); background: var(--teal-soft); }
+    .burger { display: none; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card); color: var(--text); font: 600 15px var(--sans); text-decoration: none; cursor: pointer; white-space: nowrap; transition: border-color .15s, transform .1s; }
+    .btn:hover { border-color: var(--teal); }
+    .btn:active { transform: translateY(1px); }
+    .btn.teal { background: var(--teal); color: #04221d; border-color: var(--teal); }
+    .btn.coral { background: var(--coral); color: #2a0703; border-color: var(--coral); }
+    .btn.sm { height: 34px; padding: 0 12px; font-size: 13.5px; border-radius: 9px; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 36px; align-items: center; padding-top: 70px; padding-bottom: 30px; }
+    .kicker { display: inline-flex; align-items: center; gap: 10px; font: 500 12.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--teal); }
+    .kicker i { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); display: inline-block; box-shadow: 0 0 0 0 rgba(46, 230, 197, .6); animation: ping 2s infinite; }
+    @keyframes ping { 70% { box-shadow: 0 0 0 10px rgba(46, 230, 197, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 230, 197, 0); } }
+    .hero h1 { font: 800 clamp(46px, 6.6vw, 84px)/1 var(--sans); letter-spacing: -.04em; margin: 18px 0 20px; }
+    .hero h1 .t { color: var(--teal); } .hero h1 .c { color: var(--coral); }
+    .lede { font-size: 19px; color: var(--muted); max-width: 590px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+    .fine { font-size: 13.5px; color: var(--dim); margin-top: 12px; }
+    .fine a { color: var(--teal-2); }
+    .chart { position: relative; padding: 22px; border-radius: 20px; border: 1px solid var(--line-2); background: linear-gradient(180deg, var(--card), var(--bg-2)); }
+    .chart svg { width: 100%; height: auto; display: block; }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font: 12.5px var(--mono); color: var(--muted); }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+    .sec { padding-top: 80px; }
+    .label { font: 500 12.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--teal); margin-bottom: 10px; }
+    .sec h2 { font: 800 clamp(30px, 4vw, 46px)/1.05 var(--sans); letter-spacing: -.03em; }
+    .sub { color: var(--muted); max-width: 660px; margin-top: 12px; font-size: 17px; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+    .card h3 { font: 700 20px var(--sans); margin-bottom: 6px; }
+    .card p { color: var(--muted); font-size: 15px; }
+    .rule-card .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; margin-bottom: 12px; }
+    .rule-card.sell .ic { background: var(--coral-soft); color: var(--coral); } .rule-card.buy .ic { background: var(--teal-soft); color: var(--teal); }
+    .rule-card .ex { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg-2); font: 13px var(--mono); color: var(--text); }
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font: 600 11.5px var(--mono); }
+    .tag.sell { background: var(--coral-soft); color: var(--coral); } .tag.buy { background: var(--teal-soft); color: var(--teal); }
+    .tag.ok { background: var(--teal-soft); color: var(--teal); } .tag.wait { background: var(--gold-soft); color: var(--gold); } .tag.off { background: rgba(142, 166, 184, .12); color: var(--muted); }
+    .steps { counter-reset: s; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+    .steps .card::before { counter-increment: s; content: "0" counter(s); font: 600 13px var(--mono); color: var(--teal); display: block; margin-bottom: 8px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+    th { text-align: left; font: 500 11.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); padding: 10px 12px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+    td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    td.num { font-family: var(--mono); text-align: right; }
+
+    /* app */
+    .app { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; padding-top: 30px; }
+    .field { display: grid; gap: 6px; margin-top: 14px; }
+    .field > span { font: 500 12.5px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--dim); }
+    .field input, .field select { height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 500 15px var(--mono); outline: 0; min-width: 0; }
+    .field input:focus, .field select:focus { border-color: var(--teal); }
+    .inline { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 5px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line); }
+    .kinds button { height: 42px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: 600 14px var(--sans); cursor: pointer; }
+    .kinds button[aria-pressed="true"] { background: var(--card-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
+    .kinds button.s[aria-pressed="true"] { color: var(--coral); } .kinds button.b[aria-pressed="true"] { color: var(--teal); }
+    .tokinfo { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); font: 13.5px var(--mono); color: var(--muted); display: grid; gap: 3px; }
+    .tokinfo b { color: var(--text); font-weight: 500; }
+    .preview { margin-top: 16px; padding: 14px 16px; border-radius: 14px; border: 1px dashed var(--line-2); font-size: 15px; color: var(--text); }
+    .preview small { display: block; color: var(--dim); font: 12.5px var(--mono); margin-top: 6px; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .chips button { height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: transparent; color: var(--muted); font: 500 12.5px var(--mono); cursor: pointer; }
+    .chips button[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+    .msg { margin-top: 12px; font-size: 14px; color: var(--muted); min-height: 20px; }
+    .msg.err { color: var(--coral); } .msg.ok { color: var(--teal); }
+    .wallet { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); font: 14px var(--mono); }
+    .wallet b { font-weight: 600; }
+    .notice { padding: 14px 16px; border-radius: 14px; background: var(--gold-soft); border: 1px solid rgba(255, 198, 92, .3); color: var(--text); font-size: 14.5px; margin-top: 18px; }
+
+    /* docs */
+    .docs { display: grid; grid-template-columns: 230px minmax(0, 1fr) 190px; gap: 30px; padding-top: 38px; align-items: start; }
+    .side, .toc { position: sticky; top: 86px; max-height: calc(100vh - 110px); overflow-y: auto; }
+    .side b { display: block; font: 500 11.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 20px 0 6px 10px; }
+    .side b:first-child { margin-top: 0; }
+    .side a, .toc a { display: block; padding: 6px 10px; border-radius: 8px; text-decoration: none; color: var(--muted); font-size: 14.5px; }
+    .side a:hover, .toc a:hover { color: var(--text); background: rgba(196, 231, 255, .04); }
+    .side a.on { color: var(--teal); background: var(--teal-soft); }
+    .toc p { font: 500 11.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 0 0 6px 10px; }
+    .toc a { font-size: 13.5px; padding: 4px 10px; }
+    .doc { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 34px 38px; }
+    .crumbs { font: 12.5px var(--mono); color: var(--dim); } .crumbs a { color: var(--dim); text-decoration: none; }
+    .doc h1 { font: 800 40px/1.05 var(--sans); letter-spacing: -.03em; margin: 10px 0 18px; }
+    .doc h2 { font: 700 23px var(--sans); margin: 30px 0 8px; scroll-margin-top: 86px; }
+    .doc p, .doc li { color: var(--muted); } .doc p + p { margin-top: 10px; }
+    .doc b { color: var(--text); font-weight: 600; }
+    .doc a { color: var(--teal-2); }
+    .doc ul, .doc ol { padding-left: 22px; } .doc li { margin: 6px 0; }
+    .doc code { background: var(--bg-2); padding: 1px 6px; border-radius: 5px; font-size: 13.5px; color: var(--teal-2); overflow-wrap: anywhere; }
+    .doc .code { margin: 14px 0; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line-2); font: 13px/1.7 var(--mono); white-space: pre; overflow-x: auto; }
+    .note { margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: var(--teal-soft); border: 1px solid rgba(46, 230, 197, .25); color: var(--text); }
+    .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .pager a { display: block; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line-2); text-decoration: none; }
+    .pager a:hover { border-color: var(--teal); }
+    .pager small { display: block; font: 12px var(--mono); color: var(--dim); } .pager b { font-weight: 700; }
+    .pager .nx { grid-column: 2; text-align: right; }
+
+    .pagehead { padding-top: 56px; max-width: 880px; }
+    .pagehead h1 { font: 800 clamp(40px, 6vw, 70px)/1 var(--sans); letter-spacing: -.04em; margin-top: 12px; }
+    .road { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+    .road ul { list-style: none; padding: 0; margin: 10px 0 0; }
+    .road li { padding: 7px 0 7px 24px; position: relative; color: var(--muted); font-size: 14.5px; border-bottom: 1px solid var(--line); }
+    .road li::before { content: "○"; position: absolute; left: 2px; color: var(--dim); }
+    .road li.ok { color: var(--text); } .road li.ok::before { content: "✓"; color: var(--teal); }
+    .road .ph { font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+    .road .now { border-color: rgba(46, 230, 197, .5); } .road .now .ph { color: var(--teal); }
+    .ca { margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--line-2); font: 13px var(--mono); overflow-wrap: anywhere; color: var(--muted); }
+    footer { margin-top: 90px; border-top: 1px solid var(--line); }
+    .foot { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 20px; padding-top: 34px; padding-bottom: 20px; }
+    .foot b { display: block; font-weight: 700; margin-bottom: 8px; }
+    .foot a:not(.brand) { display: block; text-decoration: none; color: var(--muted); padding: 3px 0; font-size: 14.5px; }
+    .foot a:hover { color: var(--teal); }
+    .legal { padding-bottom: 36px; font-size: 13px; color: var(--dim); }
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 11px 18px; border-radius: 10px; font-weight: 600; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40; max-width: calc(100% - 32px); text-align: center; }
+    .toast.on { opacity: 1; }
+
+    @media (max-width: 1100px) { .docs { grid-template-columns: 210px minmax(0, 1fr); } .toc { display: none; } .grid4 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 900px) {
+      .burger { display: inline-flex; margin-left: auto; }
+      .menu { display: none; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column; padding: 8px 16px 14px; background: var(--bg-2); border-bottom: 1px solid var(--line-2); }
+      .menu.open { display: flex; } .menu a { padding: 12px; }
+      .hero, .app, .grid2, .grid3, .steps, .road { grid-template-columns: 1fr; }
+      .docs { grid-template-columns: 1fr; padding-top: 22px; }
+      .side { position: static; max-height: none; display: flex; flex-wrap: wrap; gap: 2px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+      .side b { width: 100%; margin: 8px 0 2px 6px; }
+      .doc { padding: 24px 18px; } .foot { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) { .wrap { padding-left: 16px; padding-right: 16px; } .grid4, .kinds, .inline { grid-template-columns: 1fr 1fr; } .nav .hide-sm { display: none; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap nav">
+      <a class="brand" href="#/"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0f2236"/><path d="M38 12v24a10 10 0 1 1-20 0v-4" fill="none" stroke="#2ee6c5" stroke-width="6" stroke-linecap="round"/><path d="M18 32l-5 5" stroke="#2ee6c5" stroke-width="6" stroke-linecap="round"/><circle cx="38" cy="10" r="4" fill="#ff6b5b"/></svg>Hook Catch</a>
+      <nav class="menu" id="menu">
+        <a href="#/app" data-nav="app">App</a>
+        <a href="#/keepers" data-nav="keepers">Keepers</a>
+        <a href="#/docs/introduction" data-nav="docs">Docs</a>
+        <a href="#/token" data-nav="token">$HOOKCATCH</a>
+        <a href="#/roadmap" data-nav="roadmap">Roadmap</a>
+      </nav>
+      <button class="btn sm burger" id="burger" aria-label="Menu">☰</button>
+      <button class="btn sm teal hide-sm" id="connect">Connect</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- HOME -->
+    <section class="page" data-page="home">
+      <div class="wrap hero">
+        <div>
+          <span class="kicker"><i></i>Robinhood Chain · Pons & Uniswap v4</span>
+          <h1>Buy the <span class="t">dip.</span><br>Sell the <span class="c">top.</span><br>While you sleep.</h1>
+          <p class="lede">Hook Catch turns your plan into rules that trade for you. Take profit, stop loss, buy the dip and DCA, for any Pons token or any ETH-paired Uniswap v4 pool on Robinhood Chain.</p>
+          <div class="row"><a class="btn teal" href="#/app">Set a rule</a><a class="btn" href="#/docs/how-it-works">How it works</a></div>
+          <p class="fine">Sells keep your tokens in your wallet until they fire. Buys use ETH you deposit and can withdraw any time.</p>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 420 260" aria-hidden="true">
+            <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2ee6c5" stop-opacity=".25"/><stop offset="1" stop-color="#2ee6c5" stop-opacity="0"/></linearGradient></defs>
+            <line x1="0" y1="62" x2="420" y2="62" stroke="#ff6b5b" stroke-dasharray="6 6" stroke-width="2"/>
+            <line x1="0" y1="200" x2="420" y2="200" stroke="#2ee6c5" stroke-dasharray="6 6" stroke-width="2"/>
+            <path d="M0 150 L30 140 L60 160 L90 130 L120 170 L150 195 L170 205 L190 180 L220 150 L250 120 L280 95 L305 70 L320 58 L345 80 L370 100 L400 90 L420 96 L420 260 L0 260Z" fill="url(#g)"/>
+            <path d="M0 150 L30 140 L60 160 L90 130 L120 170 L150 195 L170 205 L190 180 L220 150 L250 120 L280 95 L305 70 L320 58 L345 80 L370 100 L400 90 L420 96" fill="none" stroke="#e6f2f7" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="165" cy="202" r="8" fill="#2ee6c5"/><text x="178" y="230" fill="#2ee6c5" font-family="Fira Code" font-size="13">caught the dip</text>
+            <circle cx="316" cy="61" r="8" fill="#ff6b5b"/><text x="236" y="44" fill="#ff6b5b" font-family="Fira Code" font-size="13">took the profit</text>
+          </svg>
+          <div class="legend"><span><i style="background:#2ee6c5"></i>buy line −30%</span><span><i style="background:#ff6b5b"></i>sell line +60%</span><span>illustration</span></div>
+        </div>
+      </div>
+
+      <section class="wrap sec">
+        <p class="label">Four rules</p>
+        <h2>Write the plan once.</h2>
+        <div class="grid4">
+          <article class="card rule-card sell"><div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/><path d="M21 3l-7.5 7.5"/></svg></div><span class="tag sell">SELL</span><h3 style="margin-top:8px">Take profit</h3><p>Sell when the price climbs to your target.</p><div class="ex">sell 50% at +80%</div></article>
+          <article class="card rule-card sell"><div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8 12h8"/></svg></div><span class="tag sell">SELL</span><h3 style="margin-top:8px">Stop loss</h3><p>Get out when the price falls to your floor.</p><div class="ex">sell all at −40%</div></article>
+          <article class="card rule-card buy"><div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3v10a5 5 0 1 1-10 0v-2"/><path d="M5 11l-2 2"/><circle cx="15" cy="3" r="1"/></svg></div><span class="tag buy">BUY</span><h3 style="margin-top:8px">Buy the dip</h3><p>Buy when the price drops to your line. Ladder it in steps.</p><div class="ex">0.05 ETH at −20/−35/−50%</div></article>
+          <article class="card rule-card buy"><div class="ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></div><span class="tag buy">BUY</span><h3 style="margin-top:8px">DCA</h3><p>Buy a fixed amount on a schedule, with a price ceiling.</p><div class="ex">0.01 ETH every 6 h × 20</div></article>
+        </div>
+      </section>
+
+      <section class="wrap sec">
+        <p class="label">How it works</p>
+        <h2>One contract. Open keepers.</h2>
+        <div class="steps">
+          <div class="card"><h3>Set a rule</h3><p>Pick a token and its pool, a line and a limit price. Sells need a token approval; buys need ETH deposited in the contract.</p></div>
+          <div class="card"><h3>The line is crossed</h3><p>Any keeper can call the contract. The contract itself checks the price on-chain, so nobody can fire a rule early.</p></div>
+          <div class="card"><h3>It trades</h3><p>On the Pons curve or the exact Uniswap v4 pool you picked. ETH or tokens go straight to you; the keeper earns 0.30%.</p></div>
+        </div>
+      </section>
+
+      <section class="wrap sec">
+        <p class="label">You stay in control</p>
+        <h2>Limits on everything.</h2>
+        <div class="grid3">
+          <div class="card"><h3>Limit price</h3><p>Every rule has a worst price. A sale never fills below it, a buy never above it. If the market can't meet it, nothing happens.</p></div>
+          <div class="card"><h3>Allowance and deposit</h3><p>Sells can only take what you approved. Buys can only spend what you deposited. Withdraw it any time.</p></div>
+          <div class="card"><h3>Expiry and cancel</h3><p>Every rule ends on a date you choose. Cancel any rule in one click.</p></div>
+        </div>
+      </section>
+
+      <section class="wrap sec">
+        <div class="card" style="text-align:center;padding:42px 22px">
+          <h2>Stop staring at charts.</h2>
+          <p class="sub" style="margin:12px auto 22px">Set the lines. Let the keepers watch.</p>
+          <a class="btn teal" href="#/app">Open the app</a>
+        </div>
+      </section>
+    </section>
+
+    <!-- APP -->
+    <section class="page" data-page="app">
+      <div class="wrap app">
+        <div class="card">
+          <h3>New rule</h3>
+          <div id="not-live" class="notice" hidden>The Hook Catch contract is being deployed. You can explore the builder; creating rules opens at launch.</div>
+          <label class="field"><span>Token address</span><input id="tok" placeholder="0x… Pons token or any token with an ETH v4 pool" spellcheck="false" autocomplete="off"></label><div class="chips" style="margin-top:8px"><button type="button" id="try-season">Try with $SEASON</button></div><label class="field" id="pool-field" hidden><span>Pool</span><select id="pool-sel"></select></label>
+          <div class="tokinfo" id="tokinfo" hidden></div>
+          <div class="field"><span>Rule</span><div class="kinds" id="kinds">
+            <button class="s" data-k="0" aria-pressed="true">Take profit</button><button class="s" data-k="1" aria-pressed="false">Stop loss</button><button class="b" data-k="2" aria-pressed="false">Buy the dip</button><button class="b" data-k="3" aria-pressed="false">DCA</button>
+          </div></div>
+          <div id="form"></div>
+          <div class="preview" id="preview">Pick a token to see the rule.</div>
+          <button class="btn teal" id="create" style="width:100%;margin-top:16px" disabled>Create rule</button>
+          <p class="msg" id="msg"></p>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Wallet</h3>
+            <div class="wallet"><span>Address</span><b id="w-addr">not connected</b></div>
+            <div class="wallet"><span>ETH for buys</span><b id="w-dep">—</b></div>
+            <div class="wallet"><span>Active rules</span><b id="w-active">—</b></div>
+            <div class="wallet"><span>Protocol fee</span><b id="w-fee">0.20%</b></div>
+            <label class="field"><span>Deposit / withdraw ETH</span><input id="dep-amt" type="number" min="0" step="0.01" placeholder="0.1"></label>
+            <p class="fine" style="margin:6px 0 0">Withdraw with the field empty takes out everything.</p>
+            <div class="inline" style="margin-top:10px"><button class="btn sm teal" id="dep">Deposit</button><button class="btn sm" id="wd">Withdraw</button></div>
+          </div>
+          <div class="card" style="margin-top:14px">
+            <h3>My rules</h3>
+            <div id="mine"><p class="fine">Connect a wallet to see your rules.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KEEPERS -->
+    <section class="page" data-page="keepers">
+      <div class="wrap pagehead">
+        <p class="label">Keepers</p>
+        <h1>Run a rule. Earn 0.30%.</h1>
+        <p class="sub" style="font-size:18px">Anyone can execute a rule whose line has been crossed. The contract checks everything; the keeper gets 0.30% of the trade. Ready rules show a button.</p>
+      </div>
+      <div class="wrap" style="margin-top:24px">
+        <div class="card"><div class="table-wrap" id="board"><p class="fine">Loading rules…</p></div></div>
+        <p class="fine">Running a bot instead? See <a href="#/docs/keepers">Run a keeper</a>.</p>
+      </div>
+    </section>
+
+    <!-- TOKEN -->
+    <section class="page" data-page="token">
+      <div class="wrap pagehead">
+        <p class="label">$HOOKCATCH</p>
+        <h1>The token works inside the contract.</h1>
+        <p class="sub" style="font-size:18px">Three jobs, all enforced by the Hook Catch contract itself.</p>
+      </div>
+      <div class="wrap">
+        <div class="grid3">
+          <div class="card"><h3>Lower fees</h3><p>The protocol fee is 0.20% of each trade. Hold <b>100K $HOOKCATCH</b> and it's 0.10%. Hold <b>1M</b> and it's 0%.</p></div>
+          <div class="card"><h3>More rules</h3><p>Without the token you can keep 3 rules active. Hold 100K+ for no limit.</p></div>
+          <div class="card"><h3>Buyback & burn</h3><p>Every protocol fee goes to a buyback contract that buys $HOOKCATCH and burns it. More rules firing means more burned.</p></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>Contracts</h3>
+          <div class="ca" id="ca-hc">Hook Catch: deploying</div>
+          <div class="ca" id="ca-tok">$HOOKCATCH: launching on Pons. Until then, any token using this name is not ours.</div>
+          <div class="row" id="token-links" style="margin-top:14px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROADMAP -->
+    <section class="page" data-page="roadmap">
+      <div class="wrap pagehead"><p class="label">Roadmap</p><h1>What works, and what's next.</h1></div>
+      <div class="wrap road">
+        <div class="card now"><span class="ph">Live at launch</span><h3>Rules</h3><ul><li class="ok">Take profit and stop loss</li><li class="ok">Buy the dip, ladders</li><li class="ok">DCA with a price ceiling</li><li class="ok">Pons curve and any ETH-paired v4 pool</li><li class="ok">Open keeper board</li><li class="ok">41 tests on a fork of Robinhood Chain</li></ul></div>
+        <div class="card"><span class="ph">Next</span><h3>Smarter lines</h3><ul><li>Trailing stops with a time-weighted price</li><li>Hosted keeper bot with public stats</li><li>Alerts when a rule fires</li><li>Independent review of the contract</li></ul></div>
+        <div class="card"><span class="ph">Later</span><h3>Everywhere</h3><ul><li>Rules that combine several pools</li><li>USDG and stock-token pairs</li><li>Strategy templates you can copy</li></ul></div>
+      </div>
+    </section>
+
+    <!-- CHANGELOG -->
+    <section class="page" data-page="changelog">
+      <div class="wrap pagehead"><p class="label">Changelog</p><h1>What shipped.</h1></div>
+      <div class="wrap" style="max-width:820px;margin-top:26px"><div class="card"><b>v1.0 · Launch</b> <span class="fine">Oct 2026</span><p style="margin-top:6px;color:var(--muted)">Hook Catch contract with sell and buy rules, app, keeper board, keeper bot, docs.</p></div></div>
+    </section>
+
+    <!-- DOCS -->
+    <section class="page" data-page="docs">
+      <div class="wrap docs">
+        <aside class="side" id="side"></aside>
+        <article class="doc"><div class="crumbs" id="crumbs"></div><div id="doc-body"></div><div class="pager" id="pager"></div></article>
+        <aside class="toc" id="toc"></aside>
+      </div>
+      <div hidden id="doc-src">
+        <section data-slug="introduction" data-group="Getting started" data-title="Introduction">
+          <p>Hook Catch is a contract on Robinhood Chain that trades for you when the price crosses a line you set. It works with every ETH-paired token launched on <a href="https://ponsfamily.com" target="_blank" rel="noopener">Pons</a> (on its bonding curve while it's live, and in its Uniswap v4 pool after it graduates) and with <b>any ETH-paired Uniswap v4 pool</b> on Robinhood Chain, whatever its hook.</p>
+          <h2>Four rules</h2>
+          <ul><li><b>Take profit:</b> sell when the price reaches a target.</li><li><b>Stop loss:</b> sell when the price falls to a floor.</li><li><b>Buy the dip:</b> buy when the price drops to a line. Several at different lines make a ladder.</li><li><b>DCA:</b> buy a fixed amount every interval, up to a price ceiling.</li></ul>
+          <div class="note">Hook Catch never takes custody of tokens you sell: they stay in your wallet until a rule fires. ETH for buys sits in the contract under your address and can be withdrawn any time.</div>
+        </section>
+        <section data-slug="how-it-works" data-group="Getting started" data-title="How it works">
+          <h2>1. You set a rule</h2><p>A rule names the token, the kind, the amount, a <b>trigger price</b>, a <b>limit price</b>, how many times it can run and when it expires.</p>
+          <h2>2. A keeper calls it</h2><p>Anyone can call <code>execute(id)</code>. The contract reads the live price on-chain and refuses if the line hasn't been crossed, if the rule expired or if it's too early for the next DCA run.</p>
+          <h2>3. It trades</h2><p>The contract swaps on the Pons curve, or through the Uniswap v4 pool after graduation, and refuses any fill worse than your limit price. ETH from sells and tokens from buys go straight to you. The keeper earns 0.30%.</p>
+        </section>
+        <section data-slug="take-profit-stop-loss" data-group="Rules" data-title="Take profit & stop loss">
+          <ol><li>Approve the token for the Hook Catch contract. The rule can sell at most the amount per run, and never more than your balance or approval.</li><li>Set the trigger: above the current price for take profit, below it for stop loss.</li><li>Set the limit: the lowest price you accept per token. The app suggests trigger minus your slippage.</li></ol>
+          <p>Your tokens stay in your wallet until the rule fires. Setting the approval to zero disarms every sell rule at once.</p>
+        </section>
+        <section data-slug="buy-the-dip" data-group="Rules" data-title="Buy the dip & ladders">
+          <ol><li>Deposit ETH into Hook Catch from the app.</li><li>Pick the ETH per buy and how far below the current price to buy.</li><li>For a ladder, choose several steps: the app creates one rule per step.</li></ol>
+          <p>The limit is the highest price you accept per token; the app suggests trigger plus your slippage. Tokens go straight to your wallet.</p>
+        </section>
+        <section data-slug="dca" data-group="Rules" data-title="DCA">
+          <p>A DCA rule buys the same ETH amount every interval, a set number of times. It has a <b>price ceiling</b>: if the price is above it, the run is refused and tried again later. The first run can happen right away.</p>
+        </section>
+        <section data-slug="limits" data-group="Rules" data-title="Limits & safety">
+          <ul><li><b>Limit price:</b> sells never fill below it, buys never above it.</li><li><b>Approval and deposit:</b> the contract can only use what you allowed.</li><li><b>Expiry:</b> every rule stops working at its end time.</li><li><b>Cancel:</b> any rule, any time, by its owner only.</li><li><b>Venue check:</b> a Pons curve must belong to the token, come from the Pons factory and be paired with ETH; a v4 pool must exist. Each rule trades only on its own venue.</li><li><b>Hooks:</b> a v4 pool's hook can change fills. Only pick pools whose hook you trust; your limit price still caps the damage.</li></ul>
+          <h2>Price manipulation</h2>
+          <p>Triggers read the spot price, which a keeper could push within one transaction. That's why the <b>limit price</b> exists: whatever happens to the price, your fill can't be worse than the limit. Keep limits tight on thin tokens.</p>
+        </section>
+        <section data-slug="keepers" data-group="Keepers" data-title="Run a keeper">
+          <p>A keeper watches the rules and executes the ones that are ready, earning 0.30% of each trade.</p>
+          <ul><li>Read <code>rulesCount()</code> and <code>getRules(from, to)</code> for the list.</li><li>Call <code>canExecute(id)</code>: it returns <code>(true, "")</code> when a rule is ready.</li><li>Send <code>execute(id)</code>. If someone was faster, your call reverts and you pay only gas.</li></ul>
+          <p>The open-source keeper bot in <code>keeper/</code> does exactly this every 20 seconds and skips rules whose fee would not cover the gas. Use a fresh wallet with a little ETH for gas, never your main wallet.</p>
+          <div class="code">cd keeper &amp;&amp; npm install
+KEEPER_KEY=0x… HOOKCATCH=&lt;contract&gt; node keeper.mjs</div>
+          <p>Add <code>DRY_RUN=1</code> to see what it would execute without sending anything. <code>MIN_PROFIT</code> sets how much the fee must beat the gas (default 1.2×).</p>
+          <div class="note">Small rules can cost a keeper more gas than they pay. Rules of 0.05 ETH or more are the ones keepers reliably pick up.</div>
+        </section>
+        <section data-slug="fees" data-group="Keepers" data-title="Fees">
+          <div class="code">keeper fee     0.30% of each trade, to whoever executes it
+protocol fee   0.20% → buyback & burn of $HOOKCATCH
+               0.10% if you hold 100K $HOOKCATCH
+               0%    if you hold 1M $HOOKCATCH</div>
+          <p>Fees come out of the ETH: from the proceeds of a sale, or from the ETH of a buy.</p>
+        </section>
+        <section data-slug="token" data-group="$HOOKCATCH" data-title="$HOOKCATCH">
+          <ul><li>Lower protocol fees for holders (0.10% at 100K, 0% at 1M).</li><li>Unlimited active rules for holders of 100K+ (3 without).</li><li>Every protocol fee buys back and burns $HOOKCATCH.</li></ul>
+          <p>The contract reads your balance when a rule runs or is created. The token address is set once in the contract after launch and can never change.</p>
+        </section>
+        <section data-slug="contract" data-group="Trust" data-title="Contract">
+          <p>One contract. The owner can change only the fee destination, and set the token address once. It can't touch rules, deposits or approvals.</p>
+          <div class="table-wrap"><table id="doc-addrs"></table></div>
+          <p>Source, tests and the keeper bot are on GitHub.</p>
+        </section>
+        <section data-slug="risks" data-group="Trust" data-title="Risks">
+          <ul><li>Smart contracts can have bugs. Hook Catch is tested on a fork of Robinhood Chain but has not had an independent audit yet. Start small.</li><li>A rule fires only if a keeper calls it. In quiet moments that can take a while.</li><li>The limit price protects every fill, but a fast market can blow past your line and the limit, and then nothing fills.</li><li>Pons tokens are volatile. Nothing here is financial advice.</li></ul>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div><a class="brand" href="#/" style="font-size:19px"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:28px;height:28px"><rect width="64" height="64" rx="16" fill="#0f2236"/><path d="M38 12v24a10 10 0 1 1-20 0v-4" fill="none" stroke="#2ee6c5" stroke-width="6" stroke-linecap="round"/><path d="M18 32l-5 5" stroke="#2ee6c5" stroke-width="6" stroke-linecap="round"/><circle cx="38" cy="10" r="4" fill="#ff6b5b"/></svg>Hook Catch</a><p style="color:var(--dim);font-size:14px;margin-top:8px">Rules that trade while you sleep.</p></div>
+      <div><b>Product</b><a href="#/app">App</a><a href="#/keepers">Keepers</a><a href="#/roadmap">Roadmap</a><a href="#/changelog">Changelog</a></div>
+      <div><b>Docs</b><a href="#/docs/how-it-works">How it works</a><a href="#/docs/limits">Limits & safety</a><a href="#/docs/keepers">Run a keeper</a><a href="#/docs/risks">Risks</a></div>
+      <div><b>Community</b><span id="foot-links"></span><a href="#/token">$HOOKCATCH</a></div>
+    </div>
+    <div class="wrap legal">Hook Catch is an independent contract and interface on Robinhood Chain. Not affiliated with Robinhood, Pons or Uniswap Labs. Digital assets are volatile; use only what you can afford to lose.</div>
+  </footer>
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { createPublicClient, createWalletClient, custom, http, parseEther, formatEther, formatUnits, maxUint256, isAddress, getAddress, keccak256, encodeAbiParameters, encodePacked } from 'https://cdn.jsdelivr.net/npm/viem@2.21.0/+esm';
+
+    // ===== Settings: fill these in and re-upload this one file =====
+    const CONFIG = {
+      contract: '',     // Hook Catch contract address after deployment
+      token: '',        // $HOOKCATCH token address after launch
+      x: '',            // e.g. https://x.com/yourhandle
+      github: 'https://github.com/Hook-Catch/hook-catch',
+      rpc: 'https://rpc.mainnet.chain.robinhood.com',
+    };
+    // ===============================================================
+
+    const ABI = __ABI__;
+    const ERC20 = [
+      { type: 'function', name: 'symbol', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+      { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+      { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
+      { type: 'function', name: 'allowance', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+      { type: 'function', name: 'approve', stateMutability: 'nonpayable', inputs: [{ type: 'address' }, { type: 'uint256' }], outputs: [{ type: 'bool' }] },
+    ];
+    const CURVE = [
+      { type: 'function', name: 'getReserves', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }, { type: 'uint256' }] },
+      { type: 'function', name: 'token', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+    ];
+    const FACTORY = '0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e';
+    const LAUNCH_TOPIC = '0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607';
+    const EXPLORER = 'https://robinhoodchain.blockscout.com';
+    const POOL_MANAGER = '0x8366a39CC670B4001A1121B8F6A443A643e40951';
+    const INIT_TOPIC = '0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438';
+    const PONS_HOOK = '0xE5e702641Ea86F4ae6cC3cDaeD2B886f976Be044';
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const SEASON = '0xea0071a8778fa02c12378e88868255e0e0952be6';
+    const chain = { id: 4663, name: 'Robinhood Chain', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [CONFIG.rpc] } } };
+    const pub = createPublicClient({ chain, transport: http(CONFIG.rpc) });
+    const KINDS = ['Take profit', 'Stop loss', 'Buy the dip', 'DCA'];
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const short = (a) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
+    const fmtP = (wei) => { const n = Number(formatEther(wei)); return n === 0 ? '0' : n < 1e-6 ? n.toExponential(3) : n.toPrecision(4); };
+    const fmtT = (raw, dec = 18) => Number(formatUnits(raw, dec)).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    const live = () => isAddress(CONFIG.contract || '');
+    const hc = () => ({ address: CONFIG.contract, abi: ABI });
+    function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); clearTimeout(window._t); window._t = setTimeout(() => $('toast').classList.remove('on'), 2800); }
+    const msg = (t, cls = '') => { $('msg').className = 'msg ' + cls; $('msg').innerHTML = t; };
+
+    // ---------------- wallet
+    let wallet = null, walletClient = null;
+    async function connect() {
+      if (!window.ethereum) { toast('No wallet found. On mobile, open this page in your wallet browser.'); return null; }
+      walletClient = createWalletClient({ chain, transport: custom(window.ethereum) });
+      const [a] = await walletClient.requestAddresses();
+      wallet = getAddress(a);
+      try { await walletClient.switchChain({ id: 4663 }); } catch (e) { if (e.code === 4902 || /Unrecognized|not been added/i.test(e.message)) await walletClient.addChain({ chain: { ...chain, blockExplorers: { default: { name: 'Blockscout', url: EXPLORER } } } }); }
+      $('connect').textContent = short(wallet);
+      $('w-addr').textContent = short(wallet);
+      refreshWallet();
+      return wallet;
+    }
+    async function write(args) {
+      if (!wallet && !(await connect())) throw new Error('connect a wallet');
+      const hash = await walletClient.writeContract({ account: wallet, chain, ...args });
+      msg(`Sent. <a href="${EXPLORER}/tx/${hash}" target="_blank" rel="noopener">tx ↗</a> Waiting…`);
+      const r = await pub.waitForTransactionReceipt({ hash });
+      if (r.status !== 'success') throw new Error('transaction failed');
+      return r;
+    }
+    async function refreshWallet() {
+      if (!wallet || !live()) return;
+      const [dep, act, fee] = await Promise.all([
+        pub.readContract({ ...hc(), functionName: 'deposits', args: [wallet] }),
+        pub.readContract({ ...hc(), functionName: 'activeRules', args: [wallet] }),
+        pub.readContract({ ...hc(), functionName: 'protocolFeeBps', args: [wallet] }),
+      ]);
+      $('w-dep').textContent = fmtP(dep) + ' ETH';
+      $('w-active').textContent = String(act);
+      $('w-fee').textContent = (Number(fee) / 100).toFixed(2) + '%';
+      loadRules();
+    }
+
+    // ---------------- token lookup: the Pons launch event, read from the chain
+    let tok = null;
+    // a Pons launch: the factory's launch event for this token, read straight from the chain
+    async function findCurve(token) {
+      const head = Number(await pub.getBlockNumber());
+      const topic1 = '0x' + token.slice(2).toLowerCase().padStart(64, '0');
+      const windows = [];
+      for (let to = head, k = 0; to > 0 && k < 6; to -= 9_900_000, k++) windows.push([Math.max(0, to - 9_899_999), to]);
+      const all = await Promise.all(windows.map(([f, t]) => pub.request({ method: 'eth_getLogs', params: [{ address: FACTORY, topics: [LAUNCH_TOPIC, topic1], fromBlock: '0x' + f.toString(16), toBlock: '0x' + t.toString(16) }] }).catch(() => [])));
+      const hit = all.flat()[0];
+      return hit ? getAddress('0x' + hit.topics[2].slice(26)) : null;
+    }
+    // every ETH-paired Uniswap v4 pool for this token, from the PoolManager's Initialize events
+    async function findPools(token) {
+      const head = Number(await pub.getBlockNumber());
+      const topic3 = '0x' + token.slice(2).toLowerCase().padStart(64, '0');
+      const windows = [];
+      for (let to = head, k = 0; to > 0 && k < 10; to -= 9_900_000, k++) windows.push([Math.max(0, to - 9_899_999), to]);
+      const all = await Promise.all(windows.map(([f, t]) => pub.request({ method: 'eth_getLogs', params: [{ address: POOL_MANAGER, topics: [INIT_TOPIC, null, '0x' + '0'.repeat(64), topic3], fromBlock: '0x' + f.toString(16), toBlock: '0x' + t.toString(16) }] }).catch(() => [])));
+      return all.flat().map((l) => { const d = l.data.slice(2); return { fee: parseInt(d.slice(0, 64), 16), ts: Number(BigInt.asIntN(24, BigInt('0x' + d.slice(64, 128)))), hooks: getAddress('0x' + d.slice(152, 192)) }; });
+    }
+    const stateSlot = (token, fee, ts, hooks) => keccak256(encodePacked(['bytes32', 'bytes32'], [keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'uint24' }, { type: 'int24' }, { type: 'address' }], [ZERO, token, fee, ts, hooks])), '0x' + '6'.padStart(64, '0')]));
+    const extsload = async (slot) => BigInt((await pub.call({ to: POOL_MANAGER, data: '0x1e2eaeaf' + slot.slice(2) })).data || '0x0');
+    async function sqrtOf(token, fee, ts, hooks) { return (await extsload(stateSlot(token, fee, ts, hooks))) & ((1n << 160n) - 1n); }
+    // pool liquidity sits three words after slot0 in the pool state
+    async function liquidityOf(token, fee, ts, hooks) { const s0 = BigInt(stateSlot(token, fee, ts, hooks)); return (await extsload('0x' + (s0 + 3n).toString(16).padStart(64, '0'))) & ((1n << 128n) - 1n); }
+    const fromSqrt = (sq) => (((1n << 192n) / sq) * 10n ** 18n) / sq;
+    // price in wei per 1e18 token base units, the unit the contract uses
+    async function priceOfVenue(t) {
+      if (t.curve) {
+        const sq = await sqrtOf(t.token, 0, 200, PONS_HOOK);
+        if (sq) return { p: fromSqrt(sq), onCurve: false };
+        const [q, r] = await pub.readContract({ address: t.curve, abi: CURVE, functionName: 'getReserves' });
+        return { p: (q * 10n ** 18n) / r, onCurve: true };
+      }
+      const sq = await sqrtOf(t.token, t.fee, t.ts, t.hooks);
+      return { p: sq ? fromSqrt(sq) : 0n, onCurve: false };
+    }
+    const hookName = (h) => (h === ZERO ? 'no hook' : h.toLowerCase() === PONS_HOOK.toLowerCase() ? 'Pons hook' : 'hook ' + short(h));
+    const perToken = (p, dec) => (p * 10n ** BigInt(dec)) / 10n ** 18n; // display: ETH per whole token
+    let lookupSeq = 0;
+    async function lookup() {
+      const seq = ++lookupSeq;
+      const a = $('tok').value.trim();
+      tok = null; $('pool-field').hidden = true; render();
+      if (!isAddress(a)) { $('tokinfo').hidden = true; return; }
+      $('tokinfo').hidden = false; $('tokinfo').innerHTML = 'Looking for a Pons launch and Uniswap v4 pools…';
+      try {
+        const token = getAddress(a);
+        const poolsP = findPools(token); // search both venues at once
+        const [symbol, decimals, curve] = await Promise.all([pub.readContract({ address: token, abi: ERC20, functionName: 'symbol' }), pub.readContract({ address: token, abi: ERC20, functionName: 'decimals' }), findCurve(token)]);
+        const balance = wallet ? await pub.readContract({ address: token, abi: ERC20, functionName: 'balanceOf', args: [wallet] }) : null;
+        let venue;
+        if (curve) {
+          const q = await pub.call({ to: curve, data: '0x3de35b79' }).catch(() => ({}));
+          if (q.data && BigInt(q.data) !== 0n) { $('tokinfo').innerHTML = `<b>$${esc(symbol)}</b> is a Pons launch paired with a token, not ETH. Hook Catch supports ETH pairs for now.`; return; }
+          venue = { curve, fee: 0, ts: 0, hooks: ZERO };
+        } else {
+          const seen = new Set();
+          const pools = (await poolsP).filter((p) => { const k = p.fee + ':' + p.ts + ':' + p.hooks; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 40);
+          const stats = await Promise.all(pools.map(async (p) => { const [sq, liq] = await Promise.all([sqrtOf(token, p.fee, p.ts, p.hooks), liquidityOf(token, p.fee, p.ts, p.hooks)]); return { ...p, sq, liq }; }));
+          if (seq !== lookupSeq) return;
+          const live = stats.filter((p) => p.sq > 0n && p.liq > 0n).sort((x, y) => (y.liq > x.liq ? 1 : -1)).slice(0, 15).map((p) => ({ ...p, price: fromSqrt(p.sq) }));
+          if (!live.length) { $('tokinfo').innerHTML = `No Pons launch and no ETH-paired Uniswap v4 pool found for <b>$${esc(symbol)}</b>.`; return; }
+          $('pool-sel').innerHTML = live.map((p, i) => `<option value="${i}">${i === 0 ? 'Deepest · ' : ''}fee ${p.fee === 0x800000 ? 'dynamic' : (p.fee / 10000) + '%'} · spacing ${p.ts} · ${hookName(p.hooks)}</option>`).join('');
+          $('pool-field').hidden = live.length < 2;
+          $('pool-sel').onchange = () => { const p = live[Number($('pool-sel').value)]; tok = { ...tok, curve: null, fee: p.fee, ts: p.ts, hooks: p.hooks, price: p.price }; showTok(); render(); };
+          venue = { curve: null, fee: live[0].fee, ts: live[0].ts, hooks: live[0].hooks, pools: live };
+        }
+        if (seq !== lookupSeq) return;
+        tok = { token, symbol, decimals, balance, ...venue };
+        const pr = await priceOfVenue(tok);
+        tok.price = pr.p; tok.onCurve = pr.onCurve;
+        showTok();
+        render();
+      } catch (e) { $('tokinfo').innerHTML = 'Could not read this token: ' + esc(e.shortMessage || e.message); }
+    }
+    function showTok() {
+      const where = tok.curve ? (tok.onCurve ? 'Pons curve' : 'Pons · Uniswap v4 pool') : `Uniswap v4 · ${hookName(tok.hooks)}`;
+      $('tokinfo').innerHTML = `<span><b>$${esc(tok.symbol)}</b> · ${where}</span><span>Price <b>${fmtP(perToken(tok.price, tok.decimals))} ETH</b> per token</span>${tok.balance != null ? `<span>You hold <b>${fmtT(tok.balance, tok.decimals)}</b></span>` : ''}`;
+    }
+
+    // ---------------- rule builder
+    let kind = 0;
+    const pct = (id, d) => Number($(id)?.value ?? d);
+    function chips(id, values, suffix, active) { return `<div class="chips" data-for="${id}">${values.map((v) => `<button type="button" data-v="${v}" aria-pressed="${v === active}">${v > 0 && suffix === '%' ? '+' : ''}${v}${suffix}</button>`).join('')}</div>`; }
+    function formHtml() {
+      const exp = `<label class="field"><span>Expires in</span><select id="f-exp"><option value="1">1 day</option><option value="7" selected>7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>`;
+      const slip = `<label class="field"><span>Slippage guard</span><select id="f-slip"><option value="1">1%</option><option value="3">3%</option><option value="5" selected>5%</option><option value="10">10%</option></select></label>`;
+      if (kind === 0) return `<label class="field"><span>Sell at price change</span><input id="f-move" type="number" value="80" step="1">${chips('f-move', [25, 50, 80, 150, 300], '%', 80)}</label><label class="field"><span>Amount to sell (% of balance)</span><input id="f-size" type="number" value="50" min="1" max="100"></label><div class="inline">${slip}${exp}</div>`;
+      if (kind === 1) return `<label class="field"><span>Sell at price change</span><input id="f-move" type="number" value="-40" step="1">${chips('f-move', [-15, -25, -40, -60], '%', -40)}</label><label class="field"><span>Amount to sell (% of balance)</span><input id="f-size" type="number" value="100" min="1" max="100"></label><div class="inline">${slip}${exp}</div>`;
+      if (kind === 2) return `<label class="field"><span>ETH per buy</span><input id="f-eth" type="number" value="0.05" step="0.01" min="0"></label><label class="field"><span>Buy at price change</span><input id="f-move" type="number" value="-30" step="1">${chips('f-move', [-15, -30, -50, -70], '%', -30)}</label><label class="field"><span>Ladder steps</span><select id="f-steps"><option value="1">1 buy</option><option value="2">2 buys (every 15% lower)</option><option value="3">3 buys (every 15% lower)</option></select></label><div class="inline">${slip}${exp}</div>`;
+      return `<label class="field"><span>ETH per buy</span><input id="f-eth" type="number" value="0.02" step="0.01" min="0"></label><div class="inline"><label class="field"><span>Every</span><select id="f-int"><option value="3600">1 hour</option><option value="21600" selected>6 hours</option><option value="86400">1 day</option><option value="604800">1 week</option></select></label><label class="field"><span>Number of buys</span><input id="f-runs" type="number" value="10" min="1" max="1000"></label></div><label class="field"><span>Price ceiling (change from now)</span><input id="f-move" type="number" value="50" step="1">${chips('f-move', [10, 25, 50, 100], '%', 50)}</label>${exp}`;
+    }
+    // the rules to send, from the form
+    function planned() {
+      if (!tok) return [];
+      const p = tok.price, slip = BigInt(Math.round(pct('f-slip', 5) * 100)), move = pct('f-move', 0);
+      const at = (m) => (p * BigInt(Math.round((100 + m) * 100))) / 10000n;
+      const expiry = BigInt(Math.floor(Date.now() / 1000) + pct('f-exp', 7) * 86400);
+      if (kind === 0 || kind === 1) {
+        const size = BigInt(Math.max(1, Math.min(100, Math.round(pct('f-size', 50)))));
+        const bal = tok.balance ?? 0n;
+        const amount = (bal * size) / 100n;
+        const trigger = at(move);
+        return [{ kind, amount, trigger, limit: (trigger * (10000n - slip)) / 10000n, runs: 1, interval: 0, expiry, sell: true }];
+      }
+      const eth = parseEther(String(pct('f-eth', 0) || 0));
+      if (kind === 2) {
+        const steps = pct('f-steps', 1);
+        return Array.from({ length: steps }, (_, i) => { const trigger = at(move - 15 * i); return { kind, amount: eth, trigger, limit: (trigger * (10000n + slip)) / 10000n, runs: 1, interval: 0, expiry }; });
+      }
+      return [{ kind, amount: eth, trigger: 0n, limit: at(move), runs: Math.max(1, Math.round(pct('f-runs', 10))), interval: pct('f-int', 21600), expiry }];
+    }
+    function render() {
+      document.querySelectorAll('#kinds button').forEach((b) => b.setAttribute('aria-pressed', Number(b.dataset.k) === kind));
+      if (!$('form').dataset.kind || Number($('form').dataset.kind) !== kind) { $('form').innerHTML = formHtml(); $('form').dataset.kind = kind; }
+      const rules = planned();
+      if (!tok) { $('preview').textContent = 'Pick a token to see the rule.'; $('create').disabled = true; return; }
+      const s = '$' + tok.symbol;
+      const lines = rules.map((r) => {
+        const what = tok.balance == null ? `${pct('f-size', 50)}% of your ${esc(s)}` : `${fmtT(r.amount, tok.decimals)} ${esc(s)}`;
+        const P = (x) => fmtP(perToken(x, tok.decimals));
+        if (r.kind === 0) return `Sell <b>${what}</b> when the price reaches <b>${P(r.trigger)} ETH</b>, never below ${P(r.limit)}.`;
+        if (r.kind === 1) return `Sell <b>${what}</b> if the price falls to <b>${P(r.trigger)} ETH</b>, never below ${P(r.limit)}.`;
+        if (r.kind === 2) return `Buy <b>${formatEther(r.amount)} ETH</b> of ${esc(s)} when the price drops to <b>${P(r.trigger)} ETH</b>, never above ${P(r.limit)}.`;
+        return `Buy <b>${formatEther(r.amount)} ETH</b> of ${esc(s)} every ${r.interval / 3600}h, <b>${r.runs}</b> times, while the price is under <b>${P(r.limit)} ETH</b>.`;
+      });
+      const needEth = rules.filter((r) => !r.sell).reduce((t, r) => t + r.amount * BigInt(r.runs), 0n);
+      $('preview').innerHTML = lines.join('<br>') + `<small>${rules[0]?.sell ? 'Tokens stay in your wallet until it fires. Needs a one-time token approval.' : `Needs ${formatEther(needEth)} ETH deposited in total.`} Keeper fee 0.30% + protocol fee ${$('w-fee').textContent}.</small>`;
+      $('create').disabled = !live() || rules.some((r) => r.amount === 0n && !(r.sell && tok.balance == null));
+      $('not-live').hidden = live();
+    }
+    async function create() {
+      const rules = planned();
+      try {
+        if (!wallet && !(await connect())) return;
+        if (rules[0].sell) {
+          const allowed = await pub.readContract({ address: tok.token, abi: ERC20, functionName: 'allowance', args: [wallet, CONFIG.contract] });
+          if (allowed < rules[0].amount) { msg('Approve the token first (one time)…'); await write({ address: tok.token, abi: ERC20, functionName: 'approve', args: [CONFIG.contract, maxUint256] }); }
+        }
+        const now = (await pub.getBlock()).timestamp, ttl = BigInt(Math.round(pct('f-exp', 7) * 86400));
+        for (const r of rules) { r.expiry = now + ttl; await write({ ...hc(), functionName: 'createRule', args: [{ token: tok.token, curve: tok.curve || ZERO, poolFee: tok.curve ? 0 : tok.fee, tickSpacing: tok.curve ? 0 : tok.ts, hooks: tok.curve ? ZERO : tok.hooks, kind: r.kind, amount: r.amount, trigger: r.trigger, limit: r.limit, runs: r.runs, interval: r.interval, expiry: r.expiry }] }); }
+        msg(rules.length > 1 ? `${rules.length} rules created.` : 'Rule created.', 'ok');
+        refreshWallet();
+      } catch (e) { msg(e.shortMessage || e.message, 'err'); }
+    }
+
+    // ---------------- rules lists
+    async function allRules() {
+      if (!live()) return [];
+      const n = Number(await pub.readContract({ ...hc(), functionName: 'rulesCount' }));
+      const out = [];
+      for (let i = Math.max(0, n - 600); i < n; i += 200) out.push(...(await pub.readContract({ ...hc(), functionName: 'getRules', args: [BigInt(i), BigInt(Math.min(n, i + 200))] })).map((r, j) => ({ ...r, id: i + j })));
+      return out;
+    }
+    const symCache = new Map();
+    async function sym(t) { if (!symCache.has(t)) symCache.set(t, await pub.readContract({ address: t, abi: ERC20, functionName: 'symbol' }).catch(() => '?')); return symCache.get(t); }
+    const decCache = new Map();
+    async function decOf(t) { if (!decCache.has(t)) decCache.set(t, Number(await pub.readContract({ address: t, abi: ERC20, functionName: 'decimals' }).catch(() => 18))); return decCache.get(t); }
+    function ruleText(r, s, dec = 18) {
+      const P = (x) => fmtP(perToken(x, dec));
+      if (r.kind === 0 || r.kind === 1) return `${KINDS[r.kind]} · sell ${fmtT(r.amount, dec)} $${esc(s)} at ${P(r.trigger)} ETH`;
+      if (r.kind === 2) return `Buy the dip · ${formatEther(r.amount)} ETH of $${esc(s)} at ${P(r.trigger)} ETH`;
+      return `DCA · ${formatEther(r.amount)} ETH of $${esc(s)} every ${r.interval / 3600}h · ${r.runsLeft} left`;
+    }
+    async function loadRules() {
+      if (!wallet || !live()) return;
+      const mine = (await allRules()).filter((r) => r.owner.toLowerCase() === wallet.toLowerCase()).reverse();
+      if (!mine.length) { $('mine').innerHTML = '<p class="fine">No rules yet.</p>'; return; }
+      const rows = await Promise.all(mine.slice(0, 30).map(async (r) => `<div class="wallet" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px"><span class="tag ${r.active ? 'ok' : 'off'}">${r.active ? 'ACTIVE' : 'DONE'}</span><span class="fine" style="margin:0">#${r.id}</span></div><div style="margin:6px 0;font-family:var(--sans)">${ruleText(r, await sym(r.token), await decOf(r.token))}</div>${r.active ? `<button class="btn sm" data-cancel="${r.id}">Cancel</button>` : ''}</div>`));
+      $('mine').innerHTML = rows.join('');
+    }
+    async function loadBoard() {
+      if (!live()) { $('board').innerHTML = '<p class="fine">The keeper board opens when the contract is deployed.</p>'; return; }
+      const active = (await allRules()).filter((r) => r.active).reverse();
+      if (!active.length) { $('board').innerHTML = '<p class="fine">No active rules right now.</p>'; return; }
+      const rows = await Promise.all(active.slice(0, 100).map(async (r) => {
+        const [ok, why] = await pub.readContract({ ...hc(), functionName: 'canExecute', args: [BigInt(r.id)] }).catch(() => [false, 'error']);
+        return `<tr><td class="num">#${r.id}</td><td><span class="tag ${r.kind < 2 ? 'sell' : 'buy'}">${r.kind < 2 ? 'SELL' : 'BUY'}</span> ${ruleText(r, await sym(r.token), await decOf(r.token))}</td><td>${ok ? '<span class="tag ok">READY</span>' : `<span class="tag wait">${esc(why)}</span>`}</td><td>${ok ? `<button class="btn sm teal" data-exec="${r.id}">Execute</button>` : ''}</td></tr>`;
+      }));
+      $('board').innerHTML = `<table><thead><tr><th>Rule</th><th>What</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    }
+
+    // ---------------- docs + routing
+    const DOCS = [...document.querySelectorAll('#doc-src > section')].map((s) => ({ slug: s.dataset.slug, group: s.dataset.group, title: s.dataset.title, el: s }));
+    function showDoc(slug) {
+      const i = Math.max(0, DOCS.findIndex((d) => d.slug === slug)), d = DOCS[i];
+      let side = '', g = '';
+      for (const x of DOCS) { if (x.group !== g) { g = x.group; side += `<b>${esc(g)}</b>`; } side += `<a href="#/docs/${x.slug}" class="${x === d ? 'on' : ''}">${esc(x.title)}</a>`; }
+      $('side').innerHTML = side;
+      $('crumbs').innerHTML = `<a href="#/docs/introduction">Docs</a> / ${esc(d.group)} / ${esc(d.title)}`;
+      $('doc-body').innerHTML = `<h1>${esc(d.title)}</h1>` + d.el.innerHTML;
+      const hs = [...$('doc-body').querySelectorAll('h2')]; hs.forEach((h, k) => (h.id = 'h-' + k));
+      $('toc').innerHTML = hs.length ? '<p>On this page</p>' + hs.map((h) => `<a href="#/docs/${d.slug}" data-h="${h.id}">${esc(h.textContent)}</a>`).join('') : '';
+      const prev = DOCS[i - 1], next = DOCS[i + 1];
+      $('pager').innerHTML = (prev ? `<a href="#/docs/${prev.slug}"><small>← Previous</small><b>${esc(prev.title)}</b></a>` : '') + (next ? `<a class="nx" href="#/docs/${next.slug}"><small>Next →</small><b>${esc(next.title)}</b></a>` : '');
+      document.title = `${d.title} · Hook Catch docs`;
+    }
+    const PAGES = { app: 'App', keepers: 'Keepers', token: '$HOOKCATCH', roadmap: 'Roadmap', changelog: 'Changelog', docs: 'Docs' };
+    let page = 'home';
+    function route() {
+      const parts = location.hash.replace(/^#\/?/, '').split('/');
+      page = PAGES[parts[0]] ? parts[0] : 'home';
+      document.querySelectorAll('.page').forEach((p) => p.classList.toggle('on', p.dataset.page === page));
+      document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('on', a.dataset.nav === page));
+      $('menu').classList.remove('open');
+      if (page === 'docs') showDoc(parts[1]);
+      else document.title = page === 'home' ? 'Hook Catch — buy the dip, take the profit, while you sleep' : `${PAGES[page]} · Hook Catch`;
+      if (page === 'keepers') loadBoard();
+      if (page === 'app') { render(); refreshWallet(); }
+      window.scrollTo(0, 0);
+    }
+
+    // ---------------- wiring
+    const link = (a) => (a ? `<a href="${EXPLORER}/address/${a}" target="_blank" rel="noopener"><code>${a}</code></a>` : 'deploying');
+    $('doc-addrs').innerHTML = `<thead><tr><th>What</th><th>Address</th></tr></thead><tbody><tr><td>Hook Catch</td><td>${link(CONFIG.contract)}</td></tr><tr><td>$HOOKCATCH</td><td>${CONFIG.token ? link(CONFIG.token) : 'at launch'}</td></tr><tr><td>Uniswap Universal Router</td><td>${link('0x8876789976dEcBfCbBbe364623C63652db8C0904')}</td></tr><tr><td>Uniswap v4 PoolManager</td><td>${link('0x8366a39CC670B4001A1121B8F6A443A643e40951')}</td></tr><tr><td>Pons factory</td><td>${link(FACTORY)}</td></tr></tbody>`;
+    if (live()) $('ca-hc').innerHTML = 'Hook Catch: ' + link(CONFIG.contract);
+    if (CONFIG.token) $('ca-tok').innerHTML = '$HOOKCATCH: ' + link(CONFIG.token);
+    const links = [];
+    if (CONFIG.token) links.push(`<a class="btn teal" href="https://ponsfamily.com/launchpad/${CONFIG.token}" target="_blank" rel="noopener">Buy $HOOKCATCH</a>`);
+    if (CONFIG.github) links.push(`<a class="btn" href="${CONFIG.github}" target="_blank" rel="noopener">GitHub</a>`);
+    if (CONFIG.x) links.push(`<a class="btn" href="${CONFIG.x}" target="_blank" rel="noopener">X</a>`);
+    $('token-links').innerHTML = links.join('');
+    $('foot-links').innerHTML = (CONFIG.x ? `<a href="${CONFIG.x}" target="_blank" rel="noopener">X</a>` : '') + (CONFIG.github ? `<a href="${CONFIG.github}" target="_blank" rel="noopener">GitHub</a>` : '');
+
+    $('connect').onclick = connect;
+    $('try-season').onclick = () => { $('tok').value = SEASON; lookup(); };
+    $('burger').onclick = () => $('menu').classList.toggle('open');
+    $('tok').addEventListener('change', lookup);
+    $('tok').addEventListener('paste', () => setTimeout(lookup, 0));
+    $('kinds').onclick = (e) => { const k = e.target.closest('[data-k]')?.dataset.k; if (k != null) { kind = Number(k); render(); } };
+    $('form').addEventListener('input', render);
+    $('form').addEventListener('click', (e) => { const b = e.target.closest('.chips button'); if (!b) return; const id = b.parentElement.dataset.for; $(id).value = b.dataset.v; b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); render(); });
+    $('create').onclick = create;
+    $('dep').onclick = async () => { try { await write({ ...hc(), functionName: 'deposit', value: parseEther(String($('dep-amt').value || '0')) }); msg('Deposited.', 'ok'); refreshWallet(); } catch (e) { msg(e.shortMessage || e.message, 'err'); } };
+    $('wd').onclick = async () => {
+      try {
+        if (!wallet && !(await connect())) return;
+        const v = $('dep-amt').value;
+        const amt = v ? parseEther(String(v)) : await pub.readContract({ ...hc(), functionName: 'deposits', args: [wallet] });
+        if (amt === 0n) return msg('Nothing to withdraw.', 'err');
+        await write({ ...hc(), functionName: 'withdraw', args: [amt] }); msg(`Withdrew ${formatEther(amt)} ETH.`, 'ok'); refreshWallet();
+      } catch (e) { msg(e.shortMessage || e.message, 'err'); } };
+    document.addEventListener('click', async (e) => {
+      const c = e.target.closest('[data-cancel]')?.dataset.cancel;
+      if (c != null) { try { await write({ ...hc(), functionName: 'cancelRule', args: [BigInt(c)] }); toast('Rule cancelled.'); refreshWallet(); } catch (err) { toast(err.shortMessage || err.message); } }
+      const x = e.target.closest('[data-exec]')?.dataset.exec;
+      if (x != null) { try { await write({ ...hc(), functionName: 'execute', args: [BigInt(x)] }); toast('Executed. Keeper fee earned.'); loadBoard(); refreshWallet(); } catch (err) { toast(err.shortMessage || err.message); } }
+      const t = e.target.closest('[data-h]');
+      if (t) { e.preventDefault(); document.getElementById(t.dataset.h).scrollIntoView({ behavior: 'smooth' }); }
+    });
+    window.addEventListener('hashchange', route);
+    route();
+    setInterval(() => page === 'keepers' && !document.hidden && loadBoard(), 20000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+cache/
+artifacts/
+contracts/build/HookCatch.json
+contracts/deploy.html
+*.key
+.env
