@@ -327,6 +327,7 @@
         <div class="card" style="margin-top:14px">
           <h3>Contracts</h3>
           <div class="ca" id="ca-hc">Hook Catch: deploying</div>
+          <div class="ca" id="ca-bb" hidden></div>
           <div class="ca" id="ca-tok">$HOOKCATCH: launching on Pons. Until then, any token using this name is not ours.</div>
           <div class="row" id="token-links" style="margin-top:14px"></div>
         </div>
@@ -434,6 +435,7 @@ protocol fee   0.20% → buyback & burn of $HOOKCATCH
     const CONFIG = {
       contract: '0xc2ab35c41022da338a4fe450444e20a41044bdd6',     // Hook Catch contract address after deployment
       token: '0x8dfc3256151b38436412d6a2306efe61b6624a4c',        // $HOOKCATCH token address
+      buyback: '0x56076ea2c006606a8d9d8711c3d7de206fb6e161',      // buyback & burn contract (the fee sink)
       x: 'https://x.com/itshookcatch',
       github: 'https://github.com/Hook-Catch/hook-catch',
       rpc: 'https://rpc.mainnet.chain.robinhood.com',
@@ -461,7 +463,8 @@ protocol fee   0.20% → buyback & burn of $HOOKCATCH
     const ZERO = '0x0000000000000000000000000000000000000000';
     const SEASON = '0xea0071a8778fa02c12378e88868255e0e0952be6';
     const chain = { id: 4663, name: 'Robinhood Chain', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [CONFIG.rpc] } } };
-    const pub = createPublicClient({ chain, transport: http(CONFIG.rpc) });
+    // the public RPC sometimes drops requests in bursts (duplicate CORS header), so retry generously
+    const pub = createPublicClient({ chain, transport: http(CONFIG.rpc, { retryCount: 6, retryDelay: 250 }) });
     const KINDS = ['Take profit', 'Stop loss', 'Buy the dip', 'DCA'];
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -731,9 +734,17 @@ protocol fee   0.20% → buyback & burn of $HOOKCATCH
 
     // ---------------- wiring
     const link = (a) => (a ? `<a href="${EXPLORER}/address/${a}" target="_blank" rel="noopener"><code>${a}</code></a>` : 'deploying');
-    $('doc-addrs').innerHTML = `<thead><tr><th>What</th><th>Address</th></tr></thead><tbody><tr><td>Hook Catch</td><td>${link(CONFIG.contract)}</td></tr><tr><td>$HOOKCATCH</td><td>${CONFIG.token ? link(CONFIG.token) : 'at launch'}</td></tr><tr><td>Uniswap Universal Router</td><td>${link('0x8876789976dEcBfCbBbe364623C63652db8C0904')}</td></tr><tr><td>Uniswap v4 PoolManager</td><td>${link('0x8366a39CC670B4001A1121B8F6A443A643e40951')}</td></tr><tr><td>Pons factory</td><td>${link(FACTORY)}</td></tr></tbody>`;
+    $('doc-addrs').innerHTML = `<thead><tr><th>What</th><th>Address</th></tr></thead><tbody><tr><td>Hook Catch</td><td>${link(CONFIG.contract)}</td></tr><tr><td>$HOOKCATCH</td><td>${CONFIG.token ? link(CONFIG.token) : 'at launch'}</td></tr>${CONFIG.buyback ? `<tr><td>Buyback &amp; burn</td><td>${link(CONFIG.buyback)}</td></tr>` : ''}<tr><td>Uniswap Universal Router</td><td>${link('0x8876789976dEcBfCbBbe364623C63652db8C0904')}</td></tr><tr><td>Uniswap v4 PoolManager</td><td>${link('0x8366a39CC670B4001A1121B8F6A443A643e40951')}</td></tr><tr><td>Pons factory</td><td>${link(FACTORY)}</td></tr></tbody>`;
     if (live()) $('ca-hc').innerHTML = 'Hook Catch: ' + link(CONFIG.contract);
     if (CONFIG.token) $('ca-tok').innerHTML = '$HOOKCATCH: ' + link(CONFIG.token);
+    // live burn stats from the buyback contract
+    if (CONFIG.buyback) {
+      const BB = ['totalBurned', 'totalEthSpent', 'buybacks'].map((name) => ({ type: 'function', name, stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }));
+      Promise.all(['totalBurned', 'totalEthSpent', 'buybacks'].map((f) => pub.readContract({ address: CONFIG.buyback, abi: BB, functionName: f }))).then(([burned, eth, n]) => {
+        $('ca-bb').innerHTML = `Buyback &amp; burn: ${link(CONFIG.buyback)} · ${fmtT(burned, 18)} $HOOKCATCH burned in ${n} buyback${n === 1n ? '' : 's'} (${fmtP(eth)} ETH)`;
+        $('ca-bb').hidden = false;
+      }).catch(() => {});
+    }
     const links = [];
     if (CONFIG.token) links.push(`<a class="btn teal" href="https://ponsfamily.com/launchpad/${CONFIG.token}" target="_blank" rel="noopener">Buy $HOOKCATCH</a>`);
     if (CONFIG.github) links.push(`<a class="btn" href="${CONFIG.github}" target="_blank" rel="noopener">GitHub</a>`);
