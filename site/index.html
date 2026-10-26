@@ -99,6 +99,7 @@
 
     /* app */
     .app { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; padding-top: 30px; }
+    [hidden] { display: none !important; }
     .field { display: grid; gap: 6px; margin-top: 14px; }
     .field > span { font: 500 12.5px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--dim); }
     .field input, .field select { height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 500 15px var(--mono); outline: 0; min-width: 0; }
@@ -508,13 +509,20 @@ protocol fee   0.20% → buyback & burn of $HOOKCATCH
 
     // ---------------- token lookup: the Pons launch event, read from the chain
     let tok = null;
+    // the public RPC now and then drops a request (bad CORS header), so log queries get a few tries
+    async function getLogs(filter) {
+      for (let i = 0; ; i++) {
+        try { return await pub.request({ method: 'eth_getLogs', params: [filter] }); }
+        catch (e) { if (i >= 3) throw e; await new Promise((r) => setTimeout(r, 400 * (i + 1))); }
+      }
+    }
     // a Pons launch: the factory's launch event for this token, read straight from the chain
     async function findCurve(token) {
       const head = Number(await pub.getBlockNumber());
       const topic1 = '0x' + token.slice(2).toLowerCase().padStart(64, '0');
       const windows = [];
       for (let to = head, k = 0; to > 0 && k < 6; to -= 9_900_000, k++) windows.push([Math.max(0, to - 9_899_999), to]);
-      const all = await Promise.all(windows.map(([f, t]) => pub.request({ method: 'eth_getLogs', params: [{ address: FACTORY, topics: [LAUNCH_TOPIC, topic1], fromBlock: '0x' + f.toString(16), toBlock: '0x' + t.toString(16) }] }).catch(() => [])));
+      const all = await Promise.all(windows.map(([f, t]) => getLogs({ address: FACTORY, topics: [LAUNCH_TOPIC, topic1], fromBlock: '0x' + f.toString(16), toBlock: '0x' + t.toString(16) })));
       const hit = all.flat()[0];
       return hit ? getAddress('0x' + hit.topics[2].slice(26)) : null;
     }
@@ -524,7 +532,7 @@ protocol fee   0.20% → buyback & burn of $HOOKCATCH
       const topic3 = '0x' + token.slice(2).toLowerCase().padStart(64, '0');
       const windows = [];
       for (let to = head, k = 0; to > 0 && k < 10; to -= 9_900_000, k++) windows.push([Math.max(0, to - 9_899_999), to]);
-      const all = await Promise.all(windows.map(([f, t]) => pub.request({ method: 'eth_getLogs', params: [{ address: POOL_MANAGER, topics: [INIT_TOPIC, null, '0x' + '0'.repeat(64), topic3], fromBlock: '0x' + f.toString(16), toBlock: '0x' + t.toString(16) }] }).catch(() => [])));
+      const all = await Promise.all(windows.map(([f, t]) => getLogs({ address: POOL_MANAGER, topics: [INIT_TOPIC, null, '0x' + '0'.repeat(64), topic3], fromBlock: '0x' + f.toString(16), toBlock: '0x' + t.toString(16) })));
       return all.flat().map((l) => { const d = l.data.slice(2); return { fee: parseInt(d.slice(0, 64), 16), ts: Number(BigInt.asIntN(24, BigInt('0x' + d.slice(64, 128)))), hooks: getAddress('0x' + d.slice(152, 192)) }; });
     }
     const stateSlot = (token, fee, ts, hooks) => keccak256(encodePacked(['bytes32', 'bytes32'], [keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'uint24' }, { type: 'int24' }, { type: 'address' }], [ZERO, token, fee, ts, hooks])), '0x' + '6'.padStart(64, '0')]));
@@ -556,6 +564,7 @@ protocol fee   0.20% → buyback & burn of $HOOKCATCH
       try {
         const token = getAddress(a);
         const poolsP = findPools(token); // search both venues at once
+        poolsP.catch(() => {}); // unused for Pons launches
         const [symbol, decimals, curve] = await Promise.all([pub.readContract({ address: token, abi: ERC20, functionName: 'symbol' }), pub.readContract({ address: token, abi: ERC20, functionName: 'decimals' }), findCurve(token)]);
         const balance = wallet ? await pub.readContract({ address: token, abi: ERC20, functionName: 'balanceOf', args: [wallet] }) : null;
         let venue;
