@@ -16,8 +16,19 @@ command -v pm2 >/dev/null || npm install -g pm2 --silent
 echo "[3/4] Downloading the keeper..."
 mkdir -p /opt/hook-catch/keeper && cd /opt/hook-catch/keeper
 # one self-contained file (the bot plus its libraries), so no npm install is needed
-curl -fsSL --retry 3 -m 120 "https://raw.githubusercontent.com/Hook-Catch/hook-catch/main/keeper/keeper.bundle.mjs?$(date +%s)" -o keeper.bundle.mjs
-echo "    downloaded $(wc -c < keeper.bundle.mjs) bytes"
+BUNDLE_REV=7886ac45c0a4dafa1689fc97a756ca6fadf030cd
+if [ -s keeper.bundle.mjs ] && [ "$(wc -c < keeper.bundle.mjs)" -gt 400000 ] && [ "${REFRESH:-0}" != 1 ]; then
+  echo "    already downloaded"
+else
+  for url in "https://cdn.jsdelivr.net/gh/Hook-Catch/hook-catch@$BUNDLE_REV/keeper/keeper.bundle.mjs"              "https://fastly.jsdelivr.net/gh/Hook-Catch/hook-catch@$BUNDLE_REV/keeper/keeper.bundle.mjs"              "https://raw.githubusercontent.com/Hook-Catch/hook-catch/$BUNDLE_REV/keeper/keeper.bundle.mjs"; do
+    echo "    trying ${url%%/gh/*}${url##*.net}" | cut -c1-80
+    if curl -fsSL --connect-timeout 15 -m 120 "$url" -o keeper.bundle.mjs.tmp && [ "$(wc -c < keeper.bundle.mjs.tmp)" -gt 400000 ]; then
+      mv keeper.bundle.mjs.tmp keeper.bundle.mjs; break
+    fi
+  done
+  [ -s keeper.bundle.mjs ] || { echo "    could not download the keeper from any mirror"; exit 1; }
+  echo "    downloaded $(wc -c < keeper.bundle.mjs) bytes"
+fi
 
 echo "[4/4] Keeper wallet"
 if [ ! -f .env ]; then
