@@ -16,7 +16,7 @@ command -v pm2 >/dev/null || npm install -g pm2 --silent
 echo "[3/4] Downloading the keeper..."
 mkdir -p /opt/hook-catch/keeper && cd /opt/hook-catch/keeper
 # one self-contained file (the bot plus its libraries), so no npm install is needed
-BUNDLE_REV=7886ac45c0a4dafa1689fc97a756ca6fadf030cd
+BUNDLE_REV=c425ef1469ba491dbea0e6f929c0e4f92dae51e8
 if [ -s keeper.bundle.mjs ] && [ "$(wc -c < keeper.bundle.mjs)" -gt 400000 ] && [ "${REFRESH:-0}" != 1 ]; then
   echo "    already downloaded"
 else
