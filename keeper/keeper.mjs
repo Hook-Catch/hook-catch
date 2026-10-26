@@ -37,6 +37,13 @@ const ABI = [
   { type: 'function', name: 'getRules', stateMutability: 'view', inputs: [{ name: 'from', type: 'uint256' }, { name: 'to', type: 'uint256' }], outputs: [{ type: 'tuple[]', components: RULE }] },
   { type: 'function', name: 'canExecute', stateMutability: 'view', inputs: [{ name: 'id', type: 'uint256' }], outputs: [{ type: 'bool' }, { type: 'string' }] },
   { type: 'function', name: 'execute', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint256' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'feeSink', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+];
+// the buyback & burn contract, once it is the fee sink
+const BUYBACK = [
+  { type: 'function', name: 'ready', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'pending', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'buyback', stateMutability: 'nonpayable', inputs: [], outputs: [{ type: 'uint256' }] },
 ];
 const ERC20 = [
   { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
@@ -84,6 +91,23 @@ async function scan() {
     } catch (e) { log(`#${r.id} send failed: ${e.shortMessage || e.message}`); }
   }
   log(`scanned ${n} rules · ${open.length} open · ${sent} executed`);
+  await buyback();
+}
+
+// when the fee sink is the buyback contract and enough fees have piled up, buy and burn the token
+async function buyback() {
+  const sink = await read('feeSink');
+  const code = await pub.getCode({ address: sink });
+  if (!code || code === '0x') return; // a plain wallet: nothing to do
+  const ready = await pub.readContract({ address: sink, abi: BUYBACK, functionName: 'ready' }).catch(() => false);
+  if (!ready) return;
+  const pending = await pub.readContract({ address: sink, abi: BUYBACK, functionName: 'pending' });
+  if (DRY) return log(`would run buyback · ${formatEther(pending)} ETH waiting`);
+  try {
+    const hash = await wallet.writeContract({ address: sink, abi: BUYBACK, functionName: 'buyback' });
+    const rc = await pub.waitForTransactionReceipt({ hash });
+    log(rc.status === 'success' ? 'buyback & burn' : 'buyback FAILED', `${formatEther(pending)} ETH waiting`, hash);
+  } catch (e) { log(`buyback failed: ${e.shortMessage || e.message}`); }
 }
 
 log(`Hook Catch keeper · contract ${HC} · ${account ? 'keeper ' + account.address : 'dry run'}`);
