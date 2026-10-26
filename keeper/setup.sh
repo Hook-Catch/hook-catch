@@ -5,16 +5,20 @@
 set -euo pipefail
 HOOKCATCH="${HOOKCATCH:-0xc2ab35c41022da338a4fe450444e20a41044bdd6}"
 
+echo "[1/4] Installing system packages (1-3 minutes, please wait)..."
 apt-get update -y -qq && apt-get install -y -qq curl git ca-certificates >/dev/null
 if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 18 ]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null && apt-get install -y -qq nodejs >/dev/null
 fi
+echo "[2/4] Installing pm2..."
 command -v pm2 >/dev/null || npm install -g pm2 --silent
 
+echo "[3/4] Downloading the keeper..."
 mkdir -p /opt && cd /opt
 if [ -d hook-catch ]; then git -C hook-catch pull -q; else git clone -q https://github.com/Hook-Catch/hook-catch; fi
 cd hook-catch/keeper && npm install --silent --omit=dev
 
+echo "[4/4] Keeper wallet"
 if [ ! -f .env ]; then
   echo
   read -rsp "Private key of the KEEPER wallet (a fresh wallet with a little ETH, not your main one): " KEY </dev/tty; echo
